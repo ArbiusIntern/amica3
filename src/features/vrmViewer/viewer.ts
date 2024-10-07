@@ -17,7 +17,7 @@ export class Viewer {
   private _renderer?: THREE.WebGLRenderer;
   private _clock: THREE.Clock;
   private _scene: THREE.Scene;
-  private _camera?: THREE.PerspectiveCamera;
+  public _camera?: THREE.PerspectiveCamera;
   private _cameraControls?: OrbitControls;
 
   private _raycaster?: THREE.Raycaster;
@@ -32,7 +32,6 @@ export class Viewer {
   private cachedCameraRotation: THREE.Euler | null = null;
   private controller: any | null = null;
   private reticle: THREE.Mesh | null = null;
-
 
   constructor() {
     this.isReady = false;
@@ -69,6 +68,7 @@ export class Viewer {
     this.cachedCameraRotation = this._camera?.rotation.clone() as THREE.Euler;
 
     this._renderer.xr.setReferenceSpaceType('local');
+    this._renderer.xr.setFramebufferScaleFactor(5.0);
     await this._renderer.xr.setSession(session);
     this.model?.vrm?.scene.position.set(0.25, -1.5, -1.25);
 
@@ -286,7 +286,14 @@ export class Viewer {
     const delta = this._clock.getDelta();
     // update vrm components
     if (this.model) {
-      this.model.update(delta);
+      const xr = this._renderer?.xr;
+      if (this.currentSession && xr) {
+        this.model.update(delta, xr);
+        this.model?.playWalk();
+      } else {
+        this.model.update(delta);
+      }
+      
     }
 
     if (this._renderer && this._camera) {

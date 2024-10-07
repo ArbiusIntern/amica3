@@ -76,7 +76,7 @@ async function handleVRMAnimationEvent(viewer: Viewer, amicaLife: AmicaLife) {
         throw new Error("Loading animation failed");
       }
       // @ts-ignore
-      const duration = await viewer.model!.playAnimation(animation, modify);
+      const duration = await viewer.model!.playSingleAnimation(animation, modify);
       requestAnimationFrame(() => { viewer.resetCameraLerp(); });
 
       // Set timeout for the duration of the animation
