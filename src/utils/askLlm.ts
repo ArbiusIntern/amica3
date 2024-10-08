@@ -3,13 +3,22 @@ import { Chat } from "@/features/chat/chat";
 
 import { getEchoChatResponseStream } from "@/features/chat/echoChat";
 import { getOpenAiChatResponseStream } from "@/features/chat/openAiChat";
-import { getLlamaCppChatResponseStream } from "@/features/chat/llamaCppChat";
+import { getLlamaCppChatResponseStream, getLlavaCppChatResponse } from "@/features/chat/llamaCppChat";
 import { getWindowAiChatResponseStream } from "@/features/chat/windowAiChat";
-import { getOllamaChatResponseStream } from "@/features/chat/ollamaChat";
+import { getOllamaChatResponseStream, getOllamaVisionChatResponse } from "@/features/chat/ollamaChat";
 import { getKoboldAiChatResponseStream } from "@/features/chat/koboldAiChat";
 
 import { config } from "@/utils/config";
 import { processResponse } from "@/utils/processResponse";
+
+const alert = {
+  error: (title: string, message: string) => {
+    console.error(`${title}: ${message}`);
+  },
+};
+
+let chatProcessing = false; 
+let setChatProcessing = (_processing: boolean) => { chatProcessing = _processing };
 
 // Function to ask llm with custom system prompt, if doesn't want it to speak provide the chat in params as null.
 export async function askLLM(
@@ -19,16 +28,10 @@ export async function askLLM(
 ): Promise<string> {
   let streams = [];
   let readers = [];
-  let currentStreamIdx = 0
-  let setChatProcessing = (_processing: boolean) => {};
+  let currentStreamIdx = 0;
 
-  chat === null ? currentStreamIdx = 0 : null;
+  chat === null ? (currentStreamIdx = 0) : null;
 
-  const alert = {
-    error: (title: string, message: string) => {
-      console.error(`${title}: ${message}`);
-    },
-  };
   const messages: Message[] = [
     { role: "system", content: systemPrompt },
     { role: "user", content: userPrompt },
@@ -78,7 +81,7 @@ export async function askLLM(
   }
 
   currentStreamIdx++;
-  chat !== null ? currentStreamIdx = chat.currentStreamIdx : null;
+  chat !== null ? (currentStreamIdx = chat.currentStreamIdx) : null;
   setChatProcessing(true);
 
   console.time("Subconcious subroutine stream processing");
@@ -93,8 +96,8 @@ export async function askLLM(
 
   let firstTokenEncountered = false;
   let firstSentenceEncountered = false;
-  console.time('performance_time_to_first_token');
-  chat !== null ? console.time('performance_time_to_first_sentence') : null ;
+  console.time("performance_time_to_first_token");
+  chat !== null ? console.time("performance_time_to_first_sentence") : null;
 
   try {
     while (true) {
@@ -111,7 +114,6 @@ export async function askLLM(
 
       receivedMessage += value;
       receivedMessage = receivedMessage.trimStart();
-      
 
       if (chat !== null) {
         const proc = processResponse({
@@ -122,26 +124,31 @@ export async function askLLM(
           rolePlay,
           callback: (aiTalks: Screenplay[]): boolean => {
             // Generate & play audio for each sentence, display responses
-            console.debug('enqueue tts', aiTalks);
-            console.debug('streamIdx', currentStreamIdx, 'currentStreamIdx', chat.currentStreamIdx)
+            console.debug("enqueue tts", aiTalks);
+            console.debug(
+              "streamIdx",
+              currentStreamIdx,
+              "currentStreamIdx",
+              chat.currentStreamIdx,
+            );
             if (currentStreamIdx !== chat.currentStreamIdx) {
-              console.log('wrong stream idx');
+              console.log("wrong stream idx");
               return true; // should break
             }
             chat.ttsJobs.enqueue({
               screenplay: aiTalks[0],
               streamIdx: currentStreamIdx,
             });
-  
-            if (! firstSentenceEncountered) {
-              console.timeEnd('performance_time_to_first_sentence');
+
+            if (!firstSentenceEncountered) {
+              console.timeEnd("performance_time_to_first_sentence");
               firstSentenceEncountered = true;
             }
-  
+
             return false; // normal processing
-          }
+          },
         });
-  
+
         sentences = proc.sentences;
         aiTextLog = proc.aiTextLog;
         receivedMessage = proc.receivedMessage;
@@ -149,9 +156,8 @@ export async function askLLM(
         rolePlay = proc.rolePlay;
         if (proc.shouldBreak) {
           break;
-        }  
+        }
       }
-      
     }
   } catch (e: any) {
     const errMsg = e.toString();
@@ -165,8 +171,47 @@ export async function askLLM(
       setChatProcessing(false);
     }
   }
-  chat !== null ? result = aiTextLog : result = receivedMessage;
+  chat !== null ? (result = aiTextLog) : (result = receivedMessage);
   return result;
 }
 
-export default askLLM;
+export async function askVisionLLM(
+  visionPrompt: Message[],
+  llmPrompt: Message[],
+  imageData: string,
+): Promise<string> {
+  try {
+    const visionBackend = config("vision_backend");
+
+    console.debug("vision_backend", visionBackend);
+
+    const messages: Message[] = visionPrompt;
+
+    const systemPrompt = llmPrompt[0].content;
+    const userPromptStructure = llmPrompt[1].content;
+
+    let res = "";
+    if (visionBackend === "vision_llamacpp") {
+      res = await getLlavaCppChatResponse(messages, imageData);
+    } else if (visionBackend === "vision_ollama") {
+      res = await getOllamaVisionChatResponse(messages, imageData);
+    } else {
+      console.warn("vision_backend not supported", visionBackend);
+      return "vision_backend not supported";
+    }
+
+    const userPrompt = `${userPromptStructure} [[${res}]]`;
+
+    return await askLLM(systemPrompt,userPrompt,null);
+  } catch (e: any) {
+    console.error("getVisionResponse", e.toString());
+    alert?.error("Failed to get vision response", e.toString());
+    return "Failed to get vision response";
+  }
+}
+
+export function isChatProcessing() {
+  return chatProcessing;
+}
+
+export default {askLLM, askVisionLLM};

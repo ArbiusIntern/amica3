@@ -7,8 +7,8 @@ import { VRMAnimation } from "@/lib/VRMAnimation/VRMAnimation";
 export class AnimationController {
   private _motionController: MotionController;
 
-  constructor(vrm: VRM, camera: THREE.Object3D, mixer: THREE.AnimationMixer) {
-    this._motionController = new MotionController(vrm, camera, mixer);
+  constructor(vrm: VRM, mixer: THREE.AnimationMixer) {
+    this._motionController = new MotionController(vrm, mixer);
   }
 
   public playBaseAnimation(animation: VRMAnimation | THREE.AnimationClip) {
@@ -24,7 +24,7 @@ export class AnimationController {
     return this._motionController.playSingleAnimation(url, modify);
   }
 
-  public update(delta: number, xr?: THREE.WebXRManager, camera?: THREE.Object3D) {
+  public update(delta: number, xr?: THREE.WebXRManager, camera?: THREE.PerspectiveCamera) {
     (xr) ? this._motionController.update(delta, xr, camera) : this._motionController.update(delta);
   }
 }

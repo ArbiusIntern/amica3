@@ -5,15 +5,26 @@ import {
 } from "./animationUtils";
 import * as THREE from "three";
 import { loadMixamoAnimation } from "@/lib/VRMAnimation/loadMixamoAnimation";
+import { loadVRMAnimation } from "@/lib/VRMAnimation/loadVRMAnimation";
 
 const movementSpeed = 0.01;
+const fadeToSpeed = 0.5;
+
+// Define how far in front of the camera the model should be positioned
+const offsetDistance = 2; 
+
+// Introduce a buffer to avoid flickering between walking and idle states
+const nearTargetThreshold = 0.05;
+
+// Buffer zone to prevent flickering
+const idleSwitchBuffer = 0.01; 
 
 export class AutoWalk {
   private vrm?: VRM;
 
   private refSpace?: XRReferenceSpace;
   private frame?: XRFrame;
-  private camera?: THREE.Object3D;
+  private camera?: THREE.PerspectiveCamera;
   private mixer?: THREE.AnimationMixer;
 
   private _userPosition?: THREE.Vector3;
@@ -25,11 +36,12 @@ export class AutoWalk {
   private _walkAction?: THREE.AnimationAction;
   private _idleAction?: THREE.AnimationAction;
   private _currentAction?: THREE.AnimationAction;
+  private _leftTurnAction?: THREE.AnimationAction;
+  private _rightTurnAction?: THREE.AnimationAction;
 
-  constructor(vrm: VRM, mixer: THREE.AnimationMixer, camera: THREE.Object3D) {
+  constructor(vrm: VRM, mixer: THREE.AnimationMixer) {
     this.vrm = vrm;
     this.mixer = mixer;
-    this.camera = camera;
     this.registerAnimation();
   }
 
@@ -52,6 +64,34 @@ export class AutoWalk {
         loop: THREE.LoopRepeat,
       });
     }
+
+    const leftTurnAnimation = await loadMixamoAnimation(
+        "/animations/leftTurn.fbx",
+        this.vrm!,
+      );
+      if (leftTurnAnimation) {
+        const clip = await clipAnimation(this.vrm!, leftTurnAnimation);
+        this._leftTurnAction = this.mixer!.clipAction(clip);
+        Object.assign(this._leftTurnAction, {
+          clampWhenFinished: true,
+          loop: THREE.LoopRepeat,
+        });
+      }
+
+    const rightTurnAnimation = await loadMixamoAnimation(
+        "/animations/rightTurn.fbx",
+        this.vrm!,
+      );
+      if (rightTurnAnimation) {
+        const clip = await clipAnimation(this.vrm!, rightTurnAnimation);
+        this._rightTurnAction = this.mixer!.clipAction(clip);
+        Object.assign(this._rightTurnAction, {
+          clampWhenFinished: true,
+          loop: THREE.LoopRepeat,
+        });
+      }
+
+      
 
     const idleAnimation = await loadMixamoAnimation(
       "/animations/idle.fbx",
@@ -79,9 +119,7 @@ export class AutoWalk {
 
       // Set the user direction based on camera's rotation
       userDirection.set(0, 0, -1).applyQuaternion(this.camera!.quaternion);
-
-      // Define how far in front of the camera the model should be positioned
-      const offsetDistance = 2; // Adjust as needed
+      
       this._targetPosition = cameraPosition
         .clone()
         .add(userDirection.multiplyScalar(offsetDistance));
@@ -120,10 +158,6 @@ export class AutoWalk {
         .normalize(); // Calculate direction to target
       const distanceToTarget = modelPosition.distanceTo(this._targetPosition!);
 
-      // Introduce a buffer to avoid flickering between walking and idle states
-      const nearTargetThreshold = 0.1;
-      const idleSwitchBuffer = 0.1; // Buffer zone to prevent flickering
-
       const walkTargetDirection = this._targetPosition!.clone()
         .sub(modelPosition)
         .normalize(); // Walk direction
@@ -154,7 +188,7 @@ export class AutoWalk {
 
         // Ensure the model is walking
         if (this._walkAction && this._currentAction !== this._walkAction) {
-          fadeToAction(this._currentAction!, this._walkAction, 0.5);
+          fadeToAction(this._currentAction!, this._walkAction, fadeToSpeed);
           this._currentAction = this._walkAction;
         }
 
@@ -167,7 +201,7 @@ export class AutoWalk {
 
         // Ensure the model is idle
         if (this._idleAction && this._currentAction !== this._idleAction) {
-          fadeToAction(this._currentAction!, this._idleAction, 0.5);
+          fadeToAction(this._currentAction!, this._idleAction, fadeToSpeed);
           this._currentAction = this._idleAction;
         }
       }
@@ -181,7 +215,7 @@ export class AutoWalk {
   public update(
     delta: number,
     xr?: THREE.WebXRManager,
-    camera?: THREE.Object3D,
+    camera?: THREE.PerspectiveCamera,
   ) {
 
     if (xr && xr.getFrame() && xr.getReferenceSpace() && camera) {

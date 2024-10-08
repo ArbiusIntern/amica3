@@ -4,6 +4,7 @@ import { loadVRMAnimation } from "@/lib/VRMAnimation/loadVRMAnimation";
 import { loadMixamoAnimation } from "@/lib/VRMAnimation/loadMixamoAnimation";
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { config } from "@/utils/config";
+import { XRAmica } from "./xrAmica";
 
 /**
  * three.jsを使った3Dビューワー
@@ -32,6 +33,7 @@ export class Viewer {
   private cachedCameraRotation: THREE.Euler | null = null;
   private controller: any | null = null;
   private reticle: THREE.Mesh | null = null;
+  private xrAmica: XRAmica;
 
   constructor() {
     this.isReady = false;
@@ -53,6 +55,8 @@ export class Viewer {
     // animate
     this._clock = new THREE.Clock();
     this._clock.start();
+
+    this.xrAmica = new XRAmica(this);
   }
 
   public async onSessionStarted(session: XRSession) {
@@ -74,6 +78,8 @@ export class Viewer {
 
     this.currentSession = session;
     this.currentSession.addEventListener('end', this.onSessionEnded);
+
+    this.xrAmica.init();
   }
 
   public onSessionEnded(/*event*/) {
@@ -287,9 +293,10 @@ export class Viewer {
     // update vrm components
     if (this.model) {
       const xr = this._renderer?.xr;
-      if (this.currentSession && xr) {
-        this.model.update(delta, xr);
-        this.model?.playWalk();
+      const camera = this._camera;
+      if (this.currentSession && xr && camera) {
+        this.model.update(delta, xr, camera);
+        // this.model?.playWalk();
       } else {
         this.model.update(delta);
       }

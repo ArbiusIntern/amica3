@@ -70,8 +70,8 @@ export async function modifyAnimationPosition(vrm: VRM, clip: THREE.AnimationCli
         if (track.name.endsWith(".position") && track.name.includes("Hips")) {
           const values = (track as THREE.VectorKeyframeTrack).values;
           for (let i = 0; i < values.length; i += 3) {
-            values[i] -= offsetHips.x;
-            values[i + 1] -= offsetHips.y;
+            // values[i] += offsetHips.x;
+            values[i + 1] += offsetHips.y;
             // values[i + 2] -= offsetHips.z;
           }
         }

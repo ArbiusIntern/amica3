@@ -11,20 +11,19 @@ import { AutoWalk } from "./autoWalk";
 export class MotionController {
   public vrm?: VRM | null;
   public mixer?: THREE.AnimationMixer;
-  public camera?: THREE.Object3D;
+  public camera?: THREE.PerspectiveCamera;
 
 //   private _animationManager?: AnimationManager;
   private _currentAnimation?: THREE.AnimationAction | null;
   private _autoWalk?: AutoWalk;
   
 
-  constructor(vrm: VRM, camera: THREE.Object3D, mixer: THREE.AnimationMixer) {
+  constructor(vrm: VRM, mixer: THREE.AnimationMixer) {
     this.vrm = vrm;
     this._currentAnimation = null;
     this.mixer = mixer;
-    this.camera = camera;
 
-    this._autoWalk = new AutoWalk(vrm ,mixer, camera);
+    this._autoWalk = new AutoWalk(vrm ,mixer);
 
   }
 
@@ -81,7 +80,7 @@ export class MotionController {
     this._autoWalk?.autoWalk();
   }
 
-  public update(delta: number, xr?: THREE.WebXRManager, camera?: THREE.Object3D) {
+  public update(delta: number, xr?: THREE.WebXRManager, camera?: THREE.PerspectiveCamera) {
     this.mixer?.update(delta);
     (xr) ? this._autoWalk?.update(delta, xr, camera) : this._autoWalk?.update(delta);
 

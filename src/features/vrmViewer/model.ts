@@ -68,7 +68,7 @@ export class Model {
     this.mixer = new THREE.AnimationMixer(vrm.scene);
 
     this.emoteController = new EmoteController(vrm, this._lookAtTargetParent);
-    this.animationController = new AnimationController(vrm, this._lookAtTargetParent,this.mixer);
+    this.animationController = new AnimationController(vrm, this.mixer);
 
     // TODO this causes helperRoot to be rendered to side
     VRMUtils.rotateVRM0(vrm);
@@ -114,13 +114,13 @@ export class Model {
     });
   }
 
-  public update(delta: number, xr?: THREE.WebXRManager): void {
+  public update(delta: number, xr?: THREE.WebXRManager, camera?: THREE.PerspectiveCamera): void {
     if (this._lipSync) {
       const { volume } = this._lipSync.update();
       this.emoteController?.lipSync("aa", volume);
     }
 
-    (xr) ? this.animationController?.update(delta, xr, this._lookAtTargetParent) : this.animationController?.update(delta);
+    (xr) ? this.animationController?.update(delta, xr, camera) : this.animationController?.update(delta);
     this.emoteController?.update(delta);
     this.mixer?.update(delta);
     this.vrm?.update(delta);
