@@ -31,6 +31,7 @@ export class AutoWalk {
   private _userDirection?: THREE.Vector3;
   private _userRotation?: THREE.Quaternion;
 
+  private delta?: number;
   private _targetPosition?: THREE.Vector3;
 
   private _walkAction?: THREE.AnimationAction;
@@ -217,7 +218,7 @@ export class AutoWalk {
     xr?: THREE.WebXRManager,
     camera?: THREE.PerspectiveCamera,
   ) {
-
+    this.delta = delta;
     if (xr && xr.getFrame() && xr.getReferenceSpace() && camera) {
       this.frame = xr.getFrame();
       this.refSpace = xr.getReferenceSpace()!;
