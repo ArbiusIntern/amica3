@@ -6,12 +6,6 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { config } from "@/utils/config";
 import { XRAmica } from "./xrAmica";
 
-let targetPosition = new THREE.Vector3();
-let userDirection = new THREE.Vector3();
-let userPosition = new THREE.Vector3();
-
-let userRotation = new THREE.Quaternion();
-
 /**
  * three.jsを使った3Dビューワー
  *
@@ -84,8 +78,6 @@ export class Viewer {
 
     this.currentSession = session;
     this.currentSession.addEventListener('end', this.onSessionEnded);
-
-    this.xrAmica.init();
   }
 
   public onSessionEnded(/*event*/) {
@@ -298,12 +290,11 @@ export class Viewer {
     const delta = this._clock.getDelta();
     // update vrm components
     if (this.model) {
-      this.model.update(delta);
       const xr = this._renderer?.xr;
       const camera = this._camera;
       if (this.currentSession && xr && camera) {
-        this.checkUserMovement();
-        this.model?.autoWalk(targetPosition,0.01,this._camera!);
+        this.model.update(delta, xr, camera);
+        this.xrAmica.update();
       } else {
         this.model.update(delta);
       }
@@ -346,45 +337,4 @@ export class Viewer {
     this.sendScreenshotToCallback = true;
   };
 
-  private async checkUserMovement() {
-    if (this._renderer?.xr.getFrame()) {
-      this.getXRUserPositionAndRotation();
-
-      // Get the camera's current position
-      const cameraPosition =
-        this._camera?.position.clone() || new THREE.Vector3();
-      // Create a direction vector based on the camera's orientation
-      const userDirection = new THREE.Vector3();
-
-      // Set the user direction based on camera's rotation
-      userDirection.set(0, 0, -1).applyQuaternion(this._camera!.quaternion);
-      
-      targetPosition = cameraPosition
-        .clone()
-        .add(userDirection.multiplyScalar(2));
-    }
-  }
-
-  public getXRUserPositionAndRotation() {
-    const pose = this._renderer?.xr.getFrame()?.getViewerPose(this._renderer?.xr.getReferenceSpace()!);
-
-    if (pose) {
-      const userPose = pose.transform;
-      // Extract position
-      userPosition?.set(
-        userPose.position.x,
-        userPose.position.y,
-        userPose.position.z,
-      );
-      // Extract rotation (as quaternion)
-      userRotation?.set(
-        userPose.orientation.x,
-        userPose.orientation.y,
-        userPose.orientation.z,
-        userPose.orientation.w,
-      );
-      // Get user facing direction
-      userDirection?.set(0, 0, -1).applyQuaternion(userRotation!);
-    }
-  }
 }

@@ -20,6 +20,9 @@ const alert = {
 let chatProcessing = false; 
 let setChatProcessing = (_processing: boolean) => { chatProcessing = _processing };
 
+let visionProcessing = false; 
+let setVisionProcessing = (_processing: boolean) => { visionProcessing = _processing };
+
 // Function to ask llm with custom system prompt, if doesn't want it to speak provide the chat in params as null.
 export async function askLLM(
   systemPrompt: string,
@@ -177,7 +180,6 @@ export async function askLLM(
 
 export async function askVisionLLM(
   visionPrompt: Message[],
-  llmPrompt: Message[],
   imageData: string,
 ): Promise<string> {
   try {
@@ -187,9 +189,7 @@ export async function askVisionLLM(
 
     const messages: Message[] = visionPrompt;
 
-    const systemPrompt = llmPrompt[0].content;
-    const userPromptStructure = llmPrompt[1].content;
-
+    setVisionProcessing(true);
     let res = "";
     if (visionBackend === "vision_llamacpp") {
       res = await getLlavaCppChatResponse(messages, imageData);
@@ -199,10 +199,9 @@ export async function askVisionLLM(
       console.warn("vision_backend not supported", visionBackend);
       return "vision_backend not supported";
     }
+    setVisionProcessing(false);
 
-    const userPrompt = `${userPromptStructure} [[${res}]]`;
-
-    return await askLLM(systemPrompt,userPrompt,null);
+    return res;
   } catch (e: any) {
     console.error("getVisionResponse", e.toString());
     alert?.error("Failed to get vision response", e.toString());
@@ -212,6 +211,10 @@ export async function askVisionLLM(
 
 export function isChatProcessing() {
   return chatProcessing;
+}
+
+export function isVisionProcessing() {
+  return visionProcessing;
 }
 
 export default {askLLM, askVisionLLM};
