@@ -36,7 +36,6 @@ export default function VrmViewer({chatMode}:{chatMode: boolean}) {
               resolve(false);
             } else {
               await viewer.loadVrm(buildUrl(currentVrm.url));
-              await viewer.loadRoom(buildUrl('/room/myroom.glb'));
               resolve(true);
             }
           } catch (e) {
@@ -82,6 +81,14 @@ export default function VrmViewer({chatMode}:{chatMode: boolean}) {
             vrmListAddFile(file, viewer);
           }
         });
+
+    //     canvas.addEventListener("click", (event) => {
+    //       viewer.onMouseClick(event);
+    //       const intersectionDetected = viewer.onMouseClick(event);
+    //       if (intersectionDetected) {
+    //           bot.handlePoked();
+    // }
+    //     });
       }
     },
     [vrmList.findIndex(value => value.hashEquals(getCurrentVrm()?.getHash() || "")) < 0, viewer]
