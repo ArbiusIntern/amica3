@@ -1,8 +1,19 @@
 import * as THREE from "three";
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory';
+import { XRHandModelFactory } from 'three/examples/jsm/webxr/XRHandModelFactory';
+import { HTMLMesh } from 'three/examples/jsm/interactive/HTMLMesh.js';
+import { InteractiveGroup } from 'three/examples/jsm/interactive/InteractiveGroup.js';
+import Stats from 'three/examples/jsm/libs/stats.module.js';
+import {
+  reversePainterSortStable,
+  Container,
+  Root,
+} from '@pmndrs/uikit'
 import { Model } from "./model";
+import { Room } from "./room";
 import { loadVRMAnimation } from "@/lib/VRMAnimation/loadVRMAnimation";
 import { loadMixamoAnimation } from "@/lib/VRMAnimation/loadMixamoAnimation";
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { config } from "@/utils/config";
 import { XRAmica } from "./xrAmica";
 
@@ -14,15 +25,17 @@ import { XRAmica } from "./xrAmica";
 export class Viewer {
   public isReady: boolean;
   public model?: Model;
+  public room?: Room;
 
   private _renderer?: THREE.WebGLRenderer;
   private _clock: THREE.Clock;
   private _scene: THREE.Scene;
   public _camera?: THREE.PerspectiveCamera;
   private _cameraControls?: OrbitControls;
+  private _uiroot?: Root;
+  private _stats?: Stats;
+  private _statsMesh?: THREE.Mesh;
 
-  private _raycaster?: THREE.Raycaster;
-  private _mouse?: THREE.Vector2;
 
   private sendScreenshotToCallback: boolean;
   private screenshotCallback: BlobCallback | undefined;
@@ -31,8 +44,15 @@ export class Viewer {
   public currentSession: XRSession | null = null;
   private cachedCameraPosition: THREE.Vector3 | null = null;
   private cachedCameraRotation: THREE.Euler | null = null;
-  private controller: any | null = null;
-  private reticle: THREE.Mesh | null = null;
+
+  private hand1: THREE.Group | null = null;
+  private hand2: THREE.Group | null = null;
+  private controller1: THREE.Group | null = null;
+  private controller2: THREE.Group | null = null;
+  private controllerGrip1: THREE.Group | null = null;
+  private controllerGrip2: THREE.Group | null = null;
+  private handModels: { left: THREE.Object3D[], right: THREE.Object3D[] } = { left: [], right: [] };
+
   private xrAmica: XRAmica;
 
   constructor() {
@@ -59,13 +79,16 @@ export class Viewer {
     this.xrAmica = new XRAmica(this);
   }
 
+  public getCanvas() {
+    return this._renderer?.domElement?.parentElement?.getElementsByTagName("canvas")[0];
+  }
+
   public async onSessionStarted(session: XRSession) {
     if (! this._renderer) {
       return;
     }
 
-    // hide canvas element
-    const canvas = this._renderer?.domElement?.parentElement?.getElementsByTagName("canvas")[0];
+    const canvas = this.getCanvas();
     canvas!.style.display = "none";
 
     this.cachedCameraPosition = this._camera?.position.clone() as THREE.Vector3;
@@ -78,6 +101,7 @@ export class Viewer {
 
     this.currentSession = session;
     this.currentSession.addEventListener('end', this.onSessionEnded);
+    this.currentSession.addEventListener('select', this.onSelect);
   }
 
   public onSessionEnded(/*event*/) {
@@ -89,7 +113,7 @@ export class Viewer {
     this._camera?.position.copy(this.cachedCameraPosition as THREE.Vector3);
     this._camera?.rotation.copy(this.cachedCameraRotation as THREE.Euler);
 
-    const canvas = this._renderer?.domElement?.parentElement?.getElementsByTagName("canvas")[0];
+    const canvas = this.getCanvas();
     canvas!.style.display = "inline";
 
     this.currentSession.removeEventListener('end', this.onSessionEnded);
@@ -131,6 +155,16 @@ export class Viewer {
     }
   }
 
+  public loadRoom(url: string) {
+    this.room = new Room();
+    return this.room.loadRoom(url).then(async () => {
+      if (!this.room?.room) return;
+
+      this.room.room.position.set(0, -0.3, 0);
+      this._scene.add(this.room.room);
+    });
+  }
+
   /**
    * Reactで管理しているCanvasを後から設定する
    */
@@ -146,7 +180,11 @@ export class Viewer {
     });
     this._renderer.setSize(width, height);
     this._renderer.setPixelRatio(window.devicePixelRatio);
+    this._renderer.setTransparentSort(reversePainterSortStable)
+    this._renderer.localClippingEnabled = true
+    this._renderer.shadowMap.enabled = true;
     this._renderer.xr.enabled = true;
+    this._renderer.xr.setFoveation(0);
 
     // camera
     this._camera = new THREE.PerspectiveCamera(20.0, width / height, 0.1, 20.0);
@@ -166,29 +204,167 @@ export class Viewer {
 
     this._cameraControls.update();
 
-    // raycaster and mouse
-    this._raycaster = new THREE.Raycaster();
-    this._mouse = new THREE.Vector2();
+    this._uiroot = new Root(this._camera, this._renderer, {
+      flexDirection: 'row',
+      padding: 10,
+      gap: 10,
+      width: 500,
+      height: 250,
+      // display: 'none', // change to 'flex' to show in AR mode
+      /*
+      This._uiroot.setStyle({
+        display: 'none',
+      });
+      */
+    });
+    this._scene.add(this._uiroot);
+
+
+    /*
+    const c1 = new Container({
+      flexGrow: 1,
+      backgroundOpacity: 0.5,
+      hover: { backgroundOpacity: 1 },
+      backgroundColor: "red"
+    })
+    this._uiroot.add(c1)
+    const c2 = new Container({
+        flexGrow: 1,
+        backgroundOpacity: 0.5,
+        hover: { backgroundOpacity: 1 },
+        backgroundColor: "blue"
+    })
+    this._uiroot.add(c2)
+
+    c2.dispatchEvent({
+      type: 'pointerover',
+      distance: 0,
+      nativeEvent: {} as any,
+      object: c1,
+      point: new THREE.Vector3(),
+      pointerId: -1,
+    });
+    */
+
 
     // check if controller is available
     try {
-      this.controller = this._renderer.xr.getController(0);
-      this.controller.addEventListener("select", (event: any) => {
-        this.onSelect(event);
-      });
-      this._scene.add(this.controller);
+      this.controller1 = this._renderer.xr.getController(0);
+      this._scene.add(this.controller1);
+      this.controller2 = this._renderer.xr.getController(1);
+      this._scene.add(this.controller2);
 
-      this.reticle = new THREE.Mesh(
-        new THREE.RingGeometry( 0.15, 0.2, 32 ).rotateX( - Math.PI / 2 ),
-        new THREE.MeshBasicMaterial()
-      );
-      this.reticle.matrixAutoUpdate = false;
-      this.reticle.visible = false;
-      this._scene.add(this.reticle);
-      console.log('controller', this.controller);
+      console.log('controller1', this.controller1);
+      console.log('controller2', this.controller2);
+
+      const controllerModelFactory = new XRControllerModelFactory();
+      const handModelFactory = new XRHandModelFactory();
+
+      this.controllerGrip1 = this._renderer.xr.getControllerGrip(0);
+      this.controllerGrip1.add(controllerModelFactory.createControllerModel(this.controllerGrip1));
+      this._scene.add(this.controllerGrip1);
+
+      this.controllerGrip2 = this._renderer.xr.getControllerGrip(1);
+      this.controllerGrip2.add(controllerModelFactory.createControllerModel(this.controllerGrip2));
+      this._scene.add(this.controllerGrip2);
+
+      this.hand1 = this._renderer.xr.getHand(0);
+      this.hand1.userData.currentHandModel = 0;
+      this._scene.add(this.hand1);
+
+      this.hand2 = this._renderer.xr.getHand(1);
+      this.hand2.userData.currentHandModel = 0;
+      this._scene.add(this.hand2);
+
+      this.handModels.left = [
+        handModelFactory.createHandModel(this.hand1, 'boxes'),
+        handModelFactory.createHandModel(this.hand1, 'spheres'),
+        handModelFactory.createHandModel(this.hand1, 'mesh')
+      ];
+
+      this.handModels.right = [
+        handModelFactory.createHandModel(this.hand2, 'boxes'),
+        handModelFactory.createHandModel(this.hand2, 'spheres'),
+        handModelFactory.createHandModel(this.hand2, 'mesh')
+      ];
+
+      for (let i=0; i<3; ++i) {
+        {
+          const model = this.handModels.left[i];
+          model.visible = i == 0;
+          this.hand1.add(model);
+        }
+
+        {
+          const model = this.handModels.right[i];
+          model.visible = i == 0;
+          this.hand2.add(model);
+        }
+      }
+
+      // TODO fix the ts-ignore
+      const that = this;
+      // @ts-ignore
+      this.hand1.addEventListener('pinchend', function () {
+        // @ts-ignore
+        that.handModels.left[this.userData.currentHandModel].visible = false;
+        // @ts-ignore
+        this.userData.currentHandModel = (this.userData.currentHandModel + 1) % 3;
+        // @ts-ignore
+        that.handModels.left[this.userData.currentHandModel].visible = true;
+      });
+      // @ts-ignore
+      this.hand2.addEventListener('pinchend', function () {
+        // @ts-ignore
+        that.handModels.right[this.userData.currentHandModel].visible = false;
+        // @ts-ignore
+        this.userData.currentHandModel = (this.userData.currentHandModel + 1) % 3;
+        // @ts-ignore
+        that.handModels.right[this.userData.currentHandModel].visible = true;
+      });
+
+      const geometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0, -1)
+      ]);
+
+      const line = new THREE.Line(geometry);
+      line.name = 'line';
+      line.scale.z = 5;
+
+      this.controller1.add(line.clone());
+      this.controller2.add(line.clone());
+
     } catch (e) {
-      console.log("No controller available");
+      console.log("No controller available", e);
     }
+
+    const igroup = new InteractiveGroup();
+    igroup.listenToPointerEvents(this._renderer, this._camera);
+    // @ts-ignore
+    igroup.listenToXRControllerEvents(this.controller1);
+    // @ts-ignore
+    igroup.listenToXRControllerEvents(this.controller2);
+    this._scene.add(igroup);
+
+
+    // stats
+    this._stats = new Stats();
+    this._stats.dom.style.width = '80px';
+    this._stats.dom.style.height = '48px';
+    this._stats.dom.style.position = 'absolute';
+    this._stats.dom.style.top = '0px';
+    this._stats.dom.style.left = window.innerWidth - 80 + 'px';
+    document.body.appendChild(this._stats.dom);
+
+    this._statsMesh = new HTMLMesh(this._stats.dom);
+    this._statsMesh.position.x = -0.5;
+    this._statsMesh.position.y = 1.5;
+    this._statsMesh.position.z = -0.6;
+    this._statsMesh.rotation.y = Math.PI / 4;
+    this._statsMesh.scale.setScalar( 2.5 );
+    igroup.add(this._statsMesh);
+
 
     window.addEventListener("resize", () => {
       this.resize();
@@ -200,16 +376,14 @@ export class Viewer {
     });
   }
 
-  public onSelect(event: any) {
-    if (this.currentSession && this.reticle && this.reticle.visible) {
-      // reticle.matrix.decompose(this.reticle.position, this.reticle.quaternion, this.reticle.scale);
-    
-      this.model?.vrm?.scene?.position?.set(
-        this.reticle.position.x,
-        this.reticle.position.y,
-        this.reticle.position.z
-      );
-    }
+  public onSelect(event: XRInputSourceEvent) {
+    console.log('onSelect', event);
+    console.log('onSelect', event.inputSource);
+    console.log('onSelect', event.inputSource.hand);
+    console.log('onSelect', event.inputSource.handedness);
+    console.log('onSelect', event.inputSource.gripSpace);
+    console.log('onSelect', event.inputSource.targetRayMode);
+    console.log('onSelect', event.inputSource.targetRaySpace);
   }
 
   /**
@@ -286,7 +460,7 @@ export class Viewer {
     // this._cameraControls?.update();
   }
 
-  public update = (time?: DOMHighResTimeStamp, frame?: XRFrame) => {
+  public update(time?: DOMHighResTimeStamp, frame?: XRFrame) {
     const delta = this._clock.getDelta();
     // update vrm components
     if (this.model) {
@@ -302,34 +476,24 @@ export class Viewer {
     }
 
     if (this._renderer && this._camera) {
+
+      if (this._uiroot) {
+        this._uiroot.update(delta);
+      }
       this._renderer.render(this._scene, this._camera);
+      if (this._stats) {
+        this._stats.update();
+      }
+      if (this._statsMesh) {
+        // @ts-ignore
+        this._statsMesh.material.map.update();
+      }
       if (this.sendScreenshotToCallback && this.screenshotCallback) {
         this._renderer.domElement.toBlob(this.screenshotCallback, "image/jpeg");
         this.sendScreenshotToCallback = false;
 
       }
     }
-  };
-
-  public onMouseClick(event: MouseEvent): boolean {
-    if (!this._renderer || !this._camera || !this.model?.vrm) return false;
-
-    const rect = this._renderer.domElement.getBoundingClientRect();
-
-    // calculate mouse position in normalized device coordinates
-    this._mouse!.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    this._mouse!.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-    // update the picking ray with the camera and mouse position
-    this._raycaster!.setFromCamera(this._mouse!, this._camera);
-
-    // calculate objects intersecting the picking ray
-    const intersects = this._raycaster!.intersectObject(this.model.vrm.scene, true);
-
-    if (intersects.length > 0) {
-      return true;
-    }
-    return false;
   }
 
   public getScreenshotBlob = (callback: BlobCallback) => {
