@@ -15,6 +15,7 @@ import { Room } from "./room";
 import { loadVRMAnimation } from "@/lib/VRMAnimation/loadVRMAnimation";
 import { loadMixamoAnimation } from "@/lib/VRMAnimation/loadMixamoAnimation";
 import { config } from "@/utils/config";
+import { XRAmica } from "./xrAmica";
 
 /**
  * three.jsを使った3Dビューワー
@@ -29,7 +30,7 @@ export class Viewer {
   private _renderer?: THREE.WebGLRenderer;
   private _clock: THREE.Clock;
   private _scene: THREE.Scene;
-  private _camera?: THREE.PerspectiveCamera;
+  public _camera?: THREE.PerspectiveCamera;
   private _cameraControls?: OrbitControls;
   private _uiroot?: Root;
   private _stats?: Stats;
@@ -43,6 +44,7 @@ export class Viewer {
   public currentSession: XRSession | null = null;
   private cachedCameraPosition: THREE.Vector3 | null = null;
   private cachedCameraRotation: THREE.Euler | null = null;
+
   private hand1: THREE.Group | null = null;
   private hand2: THREE.Group | null = null;
   private controller1: THREE.Group | null = null;
@@ -50,6 +52,8 @@ export class Viewer {
   private controllerGrip1: THREE.Group | null = null;
   private controllerGrip2: THREE.Group | null = null;
   private handModels: { left: THREE.Object3D[], right: THREE.Object3D[] } = { left: [], right: [] };
+
+  private xrAmica: XRAmica;
 
   constructor() {
     this.isReady = false;
@@ -71,6 +75,8 @@ export class Viewer {
     // animate
     this._clock = new THREE.Clock();
     this._clock.start();
+
+    this.xrAmica = new XRAmica(this);
   }
 
   public getCanvas() {
@@ -89,6 +95,7 @@ export class Viewer {
     this.cachedCameraRotation = this._camera?.rotation.clone() as THREE.Euler;
 
     this._renderer.xr.setReferenceSpaceType('local');
+    this._renderer.xr.setFramebufferScaleFactor(5.0);
     await this._renderer.xr.setSession(session);
     this.model?.vrm?.scene.position.set(0.25, -1.5, -1.25);
 
@@ -457,7 +464,15 @@ export class Viewer {
     const delta = this._clock.getDelta();
     // update vrm components
     if (this.model) {
-      this.model.update(delta);
+      const xr = this._renderer?.xr;
+      const camera = this._camera;
+      if (this.currentSession && xr && camera) {
+        this.model.update(delta, xr, camera);
+        this.xrAmica.update();
+      } else {
+        this.model.update(delta);
+      }
+      
     }
 
     if (this._renderer && this._camera) {
@@ -485,4 +500,5 @@ export class Viewer {
     this.screenshotCallback = callback;
     this.sendScreenshotToCallback = true;
   };
+
 }

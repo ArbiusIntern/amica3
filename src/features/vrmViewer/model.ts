@@ -7,6 +7,7 @@ import { LipSync } from "@/features/lipSync/lipSync";
 import { EmoteController } from "@/features/emoteController/emoteController";
 import { Screenplay } from "@/features/chat/messages";
 import { config } from "@/utils/config";
+import { AnimationController } from "../animationController/animationController";
 
 /**
  * 3Dキャラクターを管理するクラス
@@ -14,16 +15,29 @@ import { config } from "@/utils/config";
 export class Model {
   public vrm?: VRM | null;
   public mixer?: THREE.AnimationMixer;
-  public emoteController?: EmoteController;
 
   private _lookAtTargetParent: THREE.Object3D;
   private _lipSync?: LipSync;
 
-  public _currentAction?: THREE.AnimationAction;
+  public emoteController?: EmoteController;
+  public animationController?: AnimationController;
+
 
   constructor(lookAtTargetParent: THREE.Object3D) {
     this._lookAtTargetParent = lookAtTargetParent;
     this._lipSync = new LipSync(new AudioContext());
+  }
+
+  public async playWalk(): Promise<void> {
+    this.animationController?.playWalk();
+  }
+
+  public async loadAnimation(animation: VRMAnimation | THREE.AnimationClip): Promise<void>  {
+    this.animationController?.playBaseAnimation(animation);
+  }
+
+  public async playSingleAnimation(animation: VRMAnimation | THREE.AnimationClip, modify: boolean): Promise<number> {
+    return this.animationController?.playSingleAnimation(animation, modify)!;
   }
 
   public async loadVRM(url: string): Promise<void> {
@@ -62,9 +76,8 @@ export class Model {
       vrm.scene.add(helperRoot);
     }
 
-    this.mixer = new THREE.AnimationMixer(vrm.scene);
-
     this.emoteController = new EmoteController(vrm, this._lookAtTargetParent);
+    this.animationController = new AnimationController(vrm);
 
     // TODO this causes helperRoot to be rendered to side
     VRMUtils.rotateVRM0(vrm);
@@ -82,116 +95,7 @@ export class Model {
    *
    * https://github.com/vrm-c/vrm-specification/blob/master/specification/VRMC_vrm_animation-1.0/README.ja.md
    */
-  public async loadAnimation(
-    animation: VRMAnimation | THREE.AnimationClip,
-  ): Promise<void> {
-    const { vrm, mixer } = this;
-    if (vrm == null || mixer == null) {
-      throw new Error("You have to load VRM first");
-    }
-
-    const clip =
-      animation instanceof THREE.AnimationClip
-        ? animation
-        : animation.createAnimationClip(vrm);
-    mixer.stopAllAction();
-    this._currentAction = mixer.clipAction(clip);
-    this._currentAction.play();
-  }
-
-  private async fadeToAction( destAction: THREE.AnimationAction, duration: number) {
-    let previousAction = this._currentAction;
-    this._currentAction = destAction;
-
-    if (previousAction !== this._currentAction) {
-      previousAction?.fadeOut(duration);
-    }
-
-    this._currentAction
-					.reset()
-					.setEffectiveTimeScale( 1 )
-					.setEffectiveWeight( 1 )
-					.fadeIn( 0.5 )
-					.play();
-  }
-
-  private async modifyAnimationPosition(clip: THREE.AnimationClip) {
-    const { vrm } = this;
-    if (vrm == null) {
-      throw new Error("You have to load VRM first");
-    }
-
-    // Find the hips bone
-    const hipsBone = vrm.humanoid.getNormalizedBoneNode("hips");
-
-    if (!hipsBone) {
-      throw new Error("Bone not found in VRM model");
-    }
-
-    // Use the current hips bone position as the start position
-    const currentHipsPosition = hipsBone!.getWorldPosition(new THREE.Vector3());
-
-    // Extract the start position from the animation clip
-    let clipStartPositionHips: THREE.Vector3 | null = null;
-    
-    for (const track of clip.tracks) {
-      if (track.name.endsWith(".position") && track.name.includes("Hips")) {
-        const values = (track as THREE.VectorKeyframeTrack).values;
-        clipStartPositionHips = new THREE.Vector3(values[0], values[1], values[2]);
-        break;
-      }
-    }
-
-    if (clipStartPositionHips) {
-      // Calculate the offset
-      const offsetHips = currentHipsPosition.clone().sub(clipStartPositionHips);
-
-      // Apply the offset to all keyframes
-      for (const track of clip.tracks) {
-        if (track.name.endsWith(".position") && track.name.includes("Hips")) {
-          const values = (track as THREE.VectorKeyframeTrack).values;
-          for (let i = 0; i < values.length; i += 3) {
-            values[i] -= offsetHips.x;
-            values[i + 1] -= offsetHips.y;
-            values[i + 2] -= offsetHips.z;
-          }
-        }
-      }
-    } else {
-      console.warn("Could not determine start position from animation clip.");
-    }
-  }
-
-  public async playAnimation(animation: VRMAnimation | THREE.AnimationClip, modify: boolean): Promise<number> {
-    const { vrm, mixer } = this;
-    if (vrm == null || mixer == null) {
-      throw new Error("You have to load VRM first");
-    }
-
-    const clip =
-      animation instanceof THREE.AnimationClip
-        ? animation
-        : animation.createAnimationClip(vrm);
-
-    // modify the initial position of the VRMA animation to be sync with idle animation
-    if (modify) {
-      this.modifyAnimationPosition(clip);
-    }
-    
-    const idleAction = this._currentAction!;
-    const VRMAaction = mixer.clipAction(clip);
-    VRMAaction.clampWhenFinished = true;
-    VRMAaction.loop = THREE.LoopOnce;
-    this.fadeToAction(VRMAaction,1);
-
-    const restoreState = () => {
-      mixer.removeEventListener( 'finished', restoreState );
-      this.fadeToAction(idleAction,1);
-    }
-
-    mixer.addEventListener("finished", restoreState);
-    return clip.duration;
-  }
+  
 
   public async playEmotion(expression: string) {
     this.emoteController?.playEmotion(expression);
@@ -209,14 +113,14 @@ export class Model {
     });
   }
 
-  public update(delta: number): void {
+  public update(delta: number, xr?: THREE.WebXRManager, camera?: THREE.PerspectiveCamera ): void {
     if (this._lipSync) {
       const { volume } = this._lipSync.update();
       this.emoteController?.lipSync("aa", volume);
     }
 
     this.emoteController?.update(delta);
-    this.mixer?.update(delta);
+    (xr) ? this.animationController?.update(delta, xr, camera) : this.animationController?.update(delta);
     this.vrm?.update(delta);
   }
 }
