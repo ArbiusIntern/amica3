@@ -1,6 +1,10 @@
 import * as THREE from "three";
 import { VRM } from "@pixiv/three-vrm";
 import { fadeToAction, registerAction } from "./animationUtils";
+import { TurnAnimation } from "./turnAnimation";
+import { AnimationController } from "./animationController";
+
+const fadeDuration = 0.5;
 
 export class AutoWalk {
   private vrm: VRM;
@@ -20,11 +24,14 @@ export class AutoWalk {
   private _idleAction?: THREE.AnimationAction | null;
   public _currentAction?: THREE.AnimationAction | null;
 
-  constructor(vrm: VRM, mixer: THREE.AnimationMixer) {
+  public turnAnimation?: TurnAnimation;
+
+  constructor(vrm: VRM, mixer: THREE.AnimationMixer, turnAnimation: TurnAnimation) {
     this.vrm = vrm;
     this.mixer = mixer;
     this.registerAction()
 
+    this.turnAnimation = turnAnimation;
     this._previousDirection = new THREE.Vector3(0, 0, -1);
   }
 
@@ -42,12 +49,19 @@ export class AutoWalk {
     });
   }
 
+  // Fade the current action to new action
+  private playAction(action: THREE.AnimationAction) {
+    if (action && this._currentAction !== action) {
+      fadeToAction(this._currentAction!, action, fadeDuration);
+      this._currentAction = action;
+    }
+  }
+
   public async autoWalk(currentAction?: THREE.AnimationAction): Promise<THREE.AnimationAction> {
     this._currentAction = currentAction;
 
     const modelPosition = this.vrm?.scene.position; // Current position of the model
     if (modelPosition) {
-      // Move towards the target position
       const directionToTarget = this._targetPosition!
         .clone()
         .sub(modelPosition)
@@ -56,68 +70,18 @@ export class AutoWalk {
 
       this._previousDirection!.copy(directionToTarget);
 
-      const walkTargetDirection = this._targetPosition!
-        .clone()
-        .sub(modelPosition)
-        .normalize(); // Walk direction
-
-      const rotateAngle = new THREE.Vector3(0, 1, 0); // Rotation axis for Y-axis
-      const walkRotateQuaternion: THREE.Quaternion = new THREE.Quaternion();
-      const idleRotateQuaternion: THREE.Quaternion = new THREE.Quaternion();
-
-      // Calculate the angle towards the camera direction
-      const idleAngleYCameraDirection = Math.atan2(
-        this.camera?.position.x! - modelPosition.x,
-        this.camera?.position.z! - modelPosition.z,
-      );
-
-      // Set quaternions for walking and idle
-      walkRotateQuaternion.setFromUnitVectors(
-        new THREE.Vector3(0, 0, -1), // Model's default forward direction
-        walkTargetDirection, // Direction to target
-      );
-      idleRotateQuaternion.setFromAxisAngle(
-        rotateAngle,
-        idleAngleYCameraDirection + Math.PI,
-      );
-
-      // Now calculate vertical angle (pitch) for up/down turning
-      const targetHeightDifference = this._targetPosition!.y - modelPosition.y;
-      const distanceHorizontal = Math.sqrt(
-        Math.pow(this._targetPosition!.x - modelPosition.x, 2) +
-          Math.pow(this._targetPosition!.z - modelPosition.z, 2)
-      );
-
-      // Calculate pitch (X-axis rotation)
-      const pitchAngle = Math.atan2(targetHeightDifference, distanceHorizontal);
-      const pitchQuaternion = new THREE.Quaternion().setFromAxisAngle(
-        new THREE.Vector3(-1, 0, 0), // X-axis for pitch
-        pitchAngle
-      );
-
       if (distanceToTarget > 0.05 + 0.01) {
         // Walking state: Rotate towards the target position in all axes
-        const finalRotation = walkRotateQuaternion.multiply(pitchQuaternion); // Combine pitch and yaw
-        this.vrm?.scene.quaternion.rotateTowards(finalRotation, 0.2);
-
-        // Ensure the model is walking
-        if (this._walkAction && this._currentAction !== this._walkAction) {
-          fadeToAction(this._currentAction!, this._walkAction, 0.5);
-          this._currentAction = this._walkAction;
-        }
+        this.turnAnimation?.autoTurn('walk');
+        this.playAction(this._walkAction!);
 
         // Move the model step by step towards the target
         const step = directionToTarget.multiplyScalar(0.01);
         modelPosition.add(step); // Move the model
       } else if (distanceToTarget <= 0.05) {
         // Idle state only when the model is well within the target range (buffer applied)
-        this.vrm?.scene.quaternion.rotateTowards(idleRotateQuaternion, 0.2);
-
-        // Ensure the model is idle
-        if (this._idleAction && this._currentAction !== this._idleAction) {
-          fadeToAction(this._currentAction!, this._idleAction, 0.5);
-          this._currentAction = this._idleAction;
-        }
+        this.turnAnimation?.autoTurn('idle');
+        this.playAction(this._idleAction!);
       }
     }
     return this._currentAction!;

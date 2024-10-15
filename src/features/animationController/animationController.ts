@@ -4,24 +4,40 @@ import { VRMAnimation } from "@/lib/VRMAnimation/VRMAnimation";
 import { AutoWalk } from "./autoWalk";
 import { loadMixamoAnimation } from "@/lib/VRMAnimation/loadMixamoAnimation";
 import { clipAnimation, fadeToAction, modifyAnimationPosition } from "./animationUtils";
+import { TurnAnimation } from "./turnAnimation";
 
 
 export class AnimationController {
   public vrm?: VRM;
+  public mixer?: THREE.AnimationMixer;
 
   public _currentAction?: THREE.AnimationAction | null;
 
-  private _currentAnimation?: THREE.AnimationAction | null;
-
-  public mixer?: THREE.AnimationMixer;
-
   public autoWalk?: AutoWalk;
+  public turnAnimation?: TurnAnimation;
 
   constructor(vrm: VRM) {
     this.vrm = vrm;
     this.mixer = new THREE.AnimationMixer(vrm.scene);
 
-    this.autoWalk = new AutoWalk(vrm, this.mixer);
+    this.turnAnimation = new TurnAnimation(vrm, this.mixer);
+    this.autoWalk = new AutoWalk(vrm, this.mixer, this.turnAnimation);
+  }
+
+  public async playTurn(state: "left" | "right" | "user") {
+    switch (state) {
+      case "left":
+        this._currentAction = await this.turnAnimation?.turnLeft()
+        break;
+
+      case "right":
+        this._currentAction = await this.turnAnimation?.turnRight()
+        break;
+    
+      default:
+        await this.turnAnimation?.faceUser()
+        break;
+    }
   }
 
   // Play single animation 
@@ -36,18 +52,18 @@ export class AnimationController {
     // Modify the initial position of the VRMA animation to be sync with idle animation
     (modify) ? modifyAnimationPosition(vrm ,clip) : null;
 
-    const idleAction = this._currentAnimation!;
+    const currentAction = this._currentAction!;
 
-    const VRMAaction = mixer.clipAction(clip);
-    Object.assign(VRMAaction, {
+    const newAction = mixer.clipAction(clip);
+    Object.assign(newAction, {
       clampWhenFinished: true,
       loop: THREE.LoopOnce,
     });
-    fadeToAction(idleAction, VRMAaction, 1);
+    fadeToAction(currentAction, newAction, 1);
 
     const restoreState = () => {
       mixer.removeEventListener("finished", restoreState);
-      fadeToAction(VRMAaction, idleAction, 1);
+      fadeToAction(newAction, currentAction, 1);
     };
 
     mixer.addEventListener("finished", restoreState);
@@ -76,6 +92,7 @@ export class AnimationController {
   public update(delta: number, xr?: THREE.WebXRManager, camera?: THREE.PerspectiveCamera) {
     this.mixer?.update(delta);
     (xr) ? this.autoWalk?.update(delta, xr, camera) : this.autoWalk?.update(delta);
+    (xr) ? this.turnAnimation?.update(delta, xr, camera) : this.turnAnimation?.update(delta);
 
   }
 }
