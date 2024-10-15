@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { VRM } from "@pixiv/three-vrm";
 import { VRMAnimation } from "@/lib/VRMAnimation/VRMAnimation";
-import { AutoWalk } from "./autoWalk";
+import { WalkAnimation } from "./walkAnimation";
 import { loadMixamoAnimation } from "@/lib/VRMAnimation/loadMixamoAnimation";
 import { clipAnimation, fadeToAction, modifyAnimationPosition } from "./animationUtils";
 import { TurnAnimation } from "./turnAnimation";
@@ -13,7 +13,7 @@ export class AnimationController {
 
   public _currentAction?: THREE.AnimationAction | null;
 
-  public autoWalk?: AutoWalk;
+  public walkAnimation?: WalkAnimation;
   public turnAnimation?: TurnAnimation;
 
   constructor(vrm: VRM) {
@@ -21,17 +21,25 @@ export class AnimationController {
     this.mixer = new THREE.AnimationMixer(vrm.scene);
 
     this.turnAnimation = new TurnAnimation(vrm, this.mixer);
-    this.autoWalk = new AutoWalk(vrm, this.mixer, this.turnAnimation);
+    this.walkAnimation = new WalkAnimation(vrm, this.mixer, this.turnAnimation);
   }
 
-  public async playTurn(state: "left" | "right" | "user") {
+  public async playTurn(state: "left" | "right" | "up" | "down" |"user") {
     switch (state) {
       case "left":
-        this._currentAction = await this.turnAnimation?.turnLeft()
+        this._currentAction = await this.turnAnimation?.turnLeft(this._currentAction!)
         break;
 
       case "right":
-        this._currentAction = await this.turnAnimation?.turnRight()
+        this._currentAction = await this.turnAnimation?.turnRight(this._currentAction!)
+        break;
+
+      case "up":
+        this.turnAnimation?.turnUp()
+        break;
+
+      case "down":
+        this.turnAnimation?.turnDown()
         break;
     
       default:
@@ -86,12 +94,12 @@ export class AnimationController {
   }
 
   public async playWalk() {
-    this._currentAction = await this.autoWalk?.autoWalk(this._currentAction!);
+    this._currentAction = await this.walkAnimation?.autoWalk(this._currentAction!);
   }
 
   public update(delta: number, xr?: THREE.WebXRManager, camera?: THREE.PerspectiveCamera) {
     this.mixer?.update(delta);
-    (xr) ? this.autoWalk?.update(delta, xr, camera) : this.autoWalk?.update(delta);
+    (xr) ? this.walkAnimation?.update(delta, xr, camera) : this.walkAnimation?.update(delta);
     (xr) ? this.turnAnimation?.update(delta, xr, camera) : this.turnAnimation?.update(delta);
 
   }

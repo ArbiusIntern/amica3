@@ -32,6 +32,8 @@ export class XRAmica {
     public async update() {
         // Play auto walk animation
         this.viewer?.model?.playWalk();
+        
+        // this.viewer?.model?.animationController?.playTurn("left");
 
         // Processing render scene
         if (!isVisionProcessing()) {

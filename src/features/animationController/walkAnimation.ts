@@ -6,7 +6,7 @@ import { AnimationController } from "./animationController";
 
 const fadeDuration = 0.5;
 
-export class AutoWalk {
+export class WalkAnimation {
   private vrm: VRM;
   private mixer: THREE.AnimationMixer;
 

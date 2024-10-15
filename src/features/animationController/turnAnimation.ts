@@ -10,6 +10,7 @@ const faceNewCenterSpeed = 0.2;
 // Amplify the pitch angle for more pronounced tilt effect, This factor control the pitch intensity
 const pitchAmplificationFactor = 1.5
 
+
 export class TurnAnimation {
   private vrm: VRM;
   private mixer: THREE.AnimationMixer;
@@ -47,30 +48,70 @@ export class TurnAnimation {
     });
   }
 
+  public async turnUp() {
+    const modelPosition = this.vrm?.scene.position;
 
-  public async turnLeft(){
-    const currentAction = this._currentAction!;
-    fadeToAction(currentAction, this._leftAction!, 1);
+    if (modelPosition) {
+      // Set the target position to 3 units above the current model position
+      const targetPosition = modelPosition.clone().add(new THREE.Vector3(0, 3, 0)); // Look 3 units upward
 
-    const restoreState = () => {
-      this.mixer.removeEventListener("finished", restoreState);
-      fadeToAction(this._leftAction!, currentAction, 1);
-    };
+      // Calculate the height difference and horizontal distance
+      const targetHeightDifference = targetPosition.y - modelPosition.y;
+      const distanceHorizontal = 0; // Looking directly up, so horizontal distance is zero
 
-    this.mixer.addEventListener("finished", restoreState);
+      // Calculate the pitch angle dynamically for upward tilt
+      let pitchAngle = Math.atan2(targetHeightDifference, distanceHorizontal);
+      const pitchQuaternion = new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(-1, 0, 0), // X-axis for pitch (upwards)
+        pitchAngle / pitchAmplificationFactor // Amplified
+      );
+
+      // Smoothly rotate towards the new up quaternion
+      this.vrm?.scene.quaternion.rotateTowards(pitchQuaternion, faceNewCenterSpeed);
+    }
+  }
+
+  public async turnDown() {
+    const modelPosition = this.vrm?.scene.position;
+
+    if (modelPosition) {
+      // Set the target position to 3 units above the current model position
+      const targetPosition = modelPosition.clone().add(new THREE.Vector3(0, -3, 0)); // Look 3 units upward
+
+      // Calculate the height difference and horizontal distance
+      const targetHeightDifference = targetPosition.y - modelPosition.y;
+      const distanceHorizontal = 0; // Looking directly down, so horizontal distance is zero
+
+      // Calculate the pitch angle dynamically for upward tilt
+      let pitchAngle = Math.atan2(targetHeightDifference, distanceHorizontal);
+      const pitchQuaternion = new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(-1, 0, 0), // X-axis for pitch (downwards)
+        pitchAngle / pitchAmplificationFactor // Amplified
+      );
+
+      // Smoothly rotate towards the new down quaternion
+      this.vrm?.scene.quaternion.rotateTowards(pitchQuaternion, faceNewCenterSpeed);
+    }
+  }
+
+
+  public async turnLeft(currentAction: THREE.AnimationAction){
+    this._currentAction = currentAction;
+
+    if (this._leftAction && this._currentAction !== this._leftAction) {
+        fadeToAction(this._currentAction!, this._leftAction, 0.5);
+        this._currentAction = this._leftAction;
+      }
     return this._currentAction;
   }
 
-  public async turnRight() {
-    const currentAction = this._currentAction!;
-    fadeToAction(currentAction, this._rightAction!, 1);
+  public async turnRight(currentAction: THREE.AnimationAction) {
+    this._currentAction = currentAction;
 
-    const restoreState = () => {
-      this.mixer.removeEventListener("finished", restoreState);
-      fadeToAction(this._rightAction!, currentAction, 1);
-    };
-
-    this.mixer.addEventListener("finished", restoreState);
+    if (this._rightAction && this._currentAction !== this._rightAction) {
+        fadeToAction(this._currentAction!, this._rightAction, 0.5);
+        this._currentAction = this._rightAction;
+      }
     return this._currentAction;
   }
 
