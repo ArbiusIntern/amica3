@@ -9,8 +9,6 @@ import { clipAnimation, fadeToAction, modifyAnimationPosition } from "./animatio
 export class AnimationController {
   public vrm?: VRM;
 
-  private _walkAction?: THREE.AnimationAction | null;
-  private _idleAction?: THREE.AnimationAction | null;
   public _currentAction?: THREE.AnimationAction | null;
 
   private _currentAnimation?: THREE.AnimationAction | null;
@@ -23,8 +21,7 @@ export class AnimationController {
     this.vrm = vrm;
     this.mixer = new THREE.AnimationMixer(vrm.scene);
 
-    this.autoWalk = new AutoWalk(vrm);
-    this.registerAction()
+    this.autoWalk = new AutoWalk(vrm, this.mixer);
   }
 
   // Play single animation 
@@ -70,34 +67,6 @@ export class AnimationController {
     mixer.stopAllAction();
     this._currentAction = mixer.clipAction(clip);
     this._currentAction.play();
-  }
-
-  public async registerAction() {
-    const walkAnimation = await loadMixamoAnimation("/animations/walking.fbx",this.vrm!);
-    if (walkAnimation) {
-      const clip = walkAnimation instanceof THREE.AnimationClip
-          ? walkAnimation
-          : (walkAnimation as any).createAnimationClip(this.vrm);
-      this._walkAction = this.mixer!.clipAction(clip);
-      Object.assign(this._walkAction!, {
-        clampWhenFinished: true,
-        loop: THREE.LoopRepeat,
-      });
-    }
-
-    const idleAnimation = await loadMixamoAnimation("/animations/idle.fbx",this.vrm!);
-    if (idleAnimation) {
-      const clip = idleAnimation instanceof THREE.AnimationClip
-          ? idleAnimation
-          : (idleAnimation as any).createAnimationClip(this.vrm);
-      this._idleAction = this.mixer!.clipAction(clip);
-      Object.assign(this._idleAction!, {
-        clampWhenFinished: true,
-        loop: THREE.LoopRepeat,
-      });
-    }
-
-    this.autoWalk?.registerAction(this._idleAction!, this._walkAction!);
   }
 
   public async playWalk() {

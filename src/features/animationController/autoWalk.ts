@@ -1,10 +1,10 @@
 import * as THREE from "three";
 import { VRM } from "@pixiv/three-vrm";
-import { loadMixamoAnimation } from "@/lib/VRMAnimation/loadMixamoAnimation";
-import { fadeToAction } from "./animationUtils";
+import { fadeToAction, registerAction } from "./animationUtils";
 
 export class AutoWalk {
   private vrm: VRM;
+  private mixer: THREE.AnimationMixer;
 
   public xr?: THREE.WebXRManager;
   public camera?: THREE.PerspectiveCamera;
@@ -12,6 +12,7 @@ export class AutoWalk {
   private _userPosition?: THREE.Vector3;
   private _userDirection?: THREE.Vector3;
   private _userRotation?: THREE.Quaternion;
+  private _previousDirection?: THREE.Vector3;
 
   private _targetPosition?: THREE.Vector3;
 
@@ -19,13 +20,26 @@ export class AutoWalk {
   private _idleAction?: THREE.AnimationAction | null;
   public _currentAction?: THREE.AnimationAction | null;
 
-  constructor(vrm: VRM) {
+  constructor(vrm: VRM, mixer: THREE.AnimationMixer) {
     this.vrm = vrm;
+    this.mixer = mixer;
+    this.registerAction()
+
+    this._previousDirection = new THREE.Vector3(0, 0, -1);
   }
 
-  public async registerAction(idleAction: THREE.AnimationAction, walkAction: THREE.AnimationAction) {
-    this._idleAction = idleAction;
-    this._walkAction = walkAction
+  public async registerAction() {
+    this._walkAction = await registerAction("/animations/walking.fbx", this.mixer, this.vrm)
+    Object.assign(this._walkAction!, {
+      clampWhenFinished: true,
+      loop: THREE.LoopRepeat,
+    });
+    
+    this._idleAction = await registerAction("/animations/idle.fbx", this.mixer, this.vrm)
+    Object.assign(this._idleAction!, {
+      clampWhenFinished: true,
+      loop: THREE.LoopRepeat,
+    });
   }
 
   public async autoWalk(currentAction?: THREE.AnimationAction): Promise<THREE.AnimationAction> {
@@ -39,6 +53,8 @@ export class AutoWalk {
         .sub(modelPosition)
         .normalize(); // Calculate direction to target
       const distanceToTarget = modelPosition.distanceTo(this._targetPosition!);
+
+      this._previousDirection!.copy(directionToTarget);
 
       const walkTargetDirection = this._targetPosition!
         .clone()
@@ -65,9 +81,24 @@ export class AutoWalk {
         idleAngleYCameraDirection + Math.PI,
       );
 
+      // Now calculate vertical angle (pitch) for up/down turning
+      const targetHeightDifference = this._targetPosition!.y - modelPosition.y;
+      const distanceHorizontal = Math.sqrt(
+        Math.pow(this._targetPosition!.x - modelPosition.x, 2) +
+          Math.pow(this._targetPosition!.z - modelPosition.z, 2)
+      );
+
+      // Calculate pitch (X-axis rotation)
+      const pitchAngle = Math.atan2(targetHeightDifference, distanceHorizontal);
+      const pitchQuaternion = new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(-1, 0, 0), // X-axis for pitch
+        pitchAngle
+      );
+
       if (distanceToTarget > 0.05 + 0.01) {
         // Walking state: Rotate towards the target position in all axes
-        this.vrm?.scene.quaternion.rotateTowards(walkRotateQuaternion, 0.2);
+        const finalRotation = walkRotateQuaternion.multiply(pitchQuaternion); // Combine pitch and yaw
+        this.vrm?.scene.quaternion.rotateTowards(finalRotation, 0.2);
 
         // Ensure the model is walking
         if (this._walkAction && this._currentAction !== this._walkAction) {

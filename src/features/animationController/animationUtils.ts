@@ -1,6 +1,29 @@
 import * as THREE from "three";
 import { VRM } from "@pixiv/three-vrm";
 import { VRMAnimation } from "@/lib/VRMAnimation/VRMAnimation";
+import { loadMixamoAnimation } from "@/lib/VRMAnimation/loadMixamoAnimation";
+import { loadVRMAnimation } from "@/lib/VRMAnimation/loadVRMAnimation";
+
+export async function registerAction(url: string, mixer: THREE.AnimationMixer, vrm?: VRM): Promise<THREE.AnimationAction> {
+  let animation: THREE.AnimationClip | VRMAnimation | null;
+
+  if (url.includes("vrma")) {
+    animation = await loadVRMAnimation(url);
+  } else if (url.includes("fbx")) {
+    if (!vrm) throw new Error("You have to load VRM first");
+    animation = await loadMixamoAnimation(url, vrm);
+  } else {
+    throw new Error("Incorrect animation path or file name");
+  }
+
+  if (!animation) {
+    throw new Error("Failed to load animation");
+  }
+
+  const clip = await clipAnimation(vrm!, animation);
+  const action = mixer.clipAction(clip);
+  return action;
+}
 
 // Create animation clip from animation 
 export async function clipAnimation(vrm: VRM, animation: VRMAnimation | THREE.AnimationClip): Promise<THREE.AnimationClip> {
