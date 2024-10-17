@@ -4,8 +4,8 @@ import { askVisionLLM, isVisionProcessing } from "@/utils/askLlm";
 import * as THREE from "three";
 import { Message } from "../chat/messages";
 
+// Use to query vision model
 const systemVisionPrompt = `You are a vision model integrated with a virtual character named Amica. Your purpose is to analyze the visual scene in real time and help Amica interact autonomously with her environment based on user commands or camera input. Amica is able to understand commands like "turn to face user," "walk forward," "look left," or "sit down," and she can adjust her actions to match the scene context and proximity of the user. You are tasked with interpreting these commands and aligning them with the scene in front of you. You must also be capable of detecting when the camera is pointed at Amica and when she is close enough to trigger actions like turning around to face the user or moving autonomously based on the environment. Your goal is to assist Amica in creating a more immersive and interactive experience.`
-
 const userVisionPrompt = `The user wants Amica to interact autonomously with her environment and respond to their commands. The following commands are possible: 
 1. "turn to face user"
 2. "walk up/down/left/right"
@@ -13,6 +13,10 @@ const userVisionPrompt = `The user wants Amica to interact autonomously with her
 4. "look at [object/direction]"
 5. "follow the user" 
 When the user is in frame, Amica should automatically turn towards them or interact with objects in her vicinity. Analyze the visual input to determine what actions Amica should take in real-time, while considering conversational context (if any) or environmental objects. Detect Amica's position in relation to the camera and the user.`
+
+// Use response from vision model to get the exact function from LLM model
+const systemPrompt = ``
+const userPrompt = ``
 
 const visionPrompt: Message[] = [
     { role: "system", content: systemVisionPrompt },
@@ -29,17 +33,24 @@ export class XRAmica {
         this.viewer = viewer;
     }
 
+    public async play() {
+        await this.viewer?.model?.animationController?.playWalk("up")
+        // await this.viewer?.model?.animationController?.playTurn("down");
+    }
+
     public async update() {
         // Play auto walk animation
-        this.viewer?.model?.playWalk();
+        // await this.viewer?.model?.animationController?.playWalk();
         
         // this.viewer?.model?.animationController?.playTurn("left");
 
+        // this.viewer?.model?.animationController.
+
         // Processing render scene
-        if (!isVisionProcessing()) {
-            await this.getScreenshot(); // Wait for the screenshot to be processed
-            await this.handleVisionResponse(); // Then handle the response
-        }
+        // if (!isVisionProcessing()) {
+        //     await this.getScreenshot(); // Wait for the screenshot to be processed
+        //     await this.handleVisionResponse(); // Then handle the response
+        // }
     }
 
     // Function to capture the current environment in screen

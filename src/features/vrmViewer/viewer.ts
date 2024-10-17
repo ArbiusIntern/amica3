@@ -78,6 +78,11 @@ export class Viewer {
 
     this.currentSession = session;
     this.currentSession.addEventListener('end', this.onSessionEnded);
+
+    // Temporary double click on screen to trigger single animation 
+    this._renderer.domElement?.parentElement?.addEventListener('dblclick', () => {
+        this.xrAmica.play();
+    });
   }
 
   public onSessionEnded(/*event*/) {

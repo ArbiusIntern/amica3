@@ -24,14 +24,14 @@ export class AnimationController {
     this.walkAnimation = new WalkAnimation(vrm, this.mixer, this.turnAnimation);
   }
 
-  public async playTurn(state: "left" | "right" | "up" | "down" |"user") {
+  public async playTurn(state: "left" | "right" | "up" | "down" | "user") {
     switch (state) {
       case "left":
-        this._currentAction = await this.turnAnimation?.turnLeft(this._currentAction!)
+        this.turnAnimation?.turnLeft()
         break;
 
       case "right":
-        this._currentAction = await this.turnAnimation?.turnRight(this._currentAction!)
+        this.turnAnimation?.turnRight()
         break;
 
       case "up":
@@ -43,7 +43,31 @@ export class AnimationController {
         break;
     
       default:
-        await this.turnAnimation?.faceUser()
+        this.turnAnimation?.faceUser()
+        break;
+    }
+  }
+
+  public async playWalk(state?: "left" | "right" | "up" | "down" | "auto") {
+    switch (state) {
+      case "left":
+        this._currentAction = await this.walkAnimation?.walkLeft(this._currentAction!)
+        break;
+
+      case "right":
+        this._currentAction = await this.walkAnimation?.walkRight(this._currentAction!)
+        break;
+
+      case "up":
+        this._currentAction = await this.walkAnimation?.walkUp(this._currentAction!);
+        break;
+
+      case "down":
+        this._currentAction = await this.walkAnimation?.walkDown(this._currentAction!)
+        break;
+    
+      default:
+        this._currentAction = await this.walkAnimation?.autoWalk(this._currentAction!);
         break;
     }
   }
@@ -91,10 +115,6 @@ export class AnimationController {
     mixer.stopAllAction();
     this._currentAction = mixer.clipAction(clip);
     this._currentAction.play();
-  }
-
-  public async playWalk() {
-    this._currentAction = await this.walkAnimation?.autoWalk(this._currentAction!);
   }
 
   public update(delta: number, xr?: THREE.WebXRManager, camera?: THREE.PerspectiveCamera) {

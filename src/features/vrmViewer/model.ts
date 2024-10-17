@@ -29,7 +29,7 @@ export class Model {
   }
 
   public async playWalk(): Promise<void> {
-    this.animationController?.playWalk();
+    this.animationController?.playWalk("auto");
   }
 
   public async loadAnimation(animation: VRMAnimation | THREE.AnimationClip): Promise<void>  {

@@ -82,13 +82,14 @@ export default function VrmViewer({chatMode}:{chatMode: boolean}) {
           }
         });
 
-    //     canvas.addEventListener("click", (event) => {
-    //       viewer.onMouseClick(event);
-    //       const intersectionDetected = viewer.onMouseClick(event);
-    //       if (intersectionDetected) {
-    //           bot.handlePoked();
-    // }
-    //     });
+        // canvas.addEventListener("click", (event) => {
+        //   viewer.onMouseClick(event);
+        //   const intersectionDetected = viewer.onMouseClick(event);
+        //   if (intersectionDetected) {
+        //       console.log("Poked!")
+        //       bot.handlePoked();
+        //   }
+        // });
       }
     },
     [vrmList.findIndex(value => value.hashEquals(getCurrentVrm()?.getHash() || "")) < 0, viewer]

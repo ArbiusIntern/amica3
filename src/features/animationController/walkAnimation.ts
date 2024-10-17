@@ -2,7 +2,6 @@ import * as THREE from "three";
 import { VRM } from "@pixiv/three-vrm";
 import { fadeToAction, registerAction } from "./animationUtils";
 import { TurnAnimation } from "./turnAnimation";
-import { AnimationController } from "./animationController";
 
 const fadeDuration = 0.5;
 
@@ -25,6 +24,9 @@ export class WalkAnimation {
   public _currentAction?: THREE.AnimationAction | null;
 
   public turnAnimation?: TurnAnimation;
+
+  private targetDirection: THREE.Vector3 | null = null;
+  private walkSpeed = 0.5;
 
   constructor(vrm: VRM, mixer: THREE.AnimationMixer, turnAnimation: TurnAnimation) {
     this.vrm = vrm;
@@ -57,6 +59,80 @@ export class WalkAnimation {
     }
   }
 
+  // Walk up (move upwards, forward to users)
+  public async walkUp(currentAction?: THREE.AnimationAction): Promise<THREE.AnimationAction> {
+    this._currentAction = currentAction;
+
+    const modelPosition = this.vrm?.scene.position;
+    if (modelPosition) {
+      await this.turnAnimation?.turnUp();
+      this.playAction(this._walkAction!);
+      this.targetDirection = modelPosition.clone().add(new THREE.Vector3(0, 0, 1)); 
+    }
+    return this.handleMovement();
+  }
+
+  // Move down (move away from users)
+  public async walkDown(currentAction?: THREE.AnimationAction): Promise<THREE.AnimationAction> {
+    this._currentAction = currentAction;
+
+    const modelPosition = this.vrm?.scene.position;
+    if (modelPosition) {
+      await this.turnAnimation?.turnDown();
+      this.playAction(this._walkAction!);
+      this.targetDirection = modelPosition.clone().add(new THREE.Vector3(0, 0, -1)); 
+    }
+    return this.handleMovement();
+  }
+
+  public async walkLeft(currentAction?: THREE.AnimationAction): Promise<THREE.AnimationAction> {
+    this._currentAction = currentAction;
+
+    const modelPosition = this.vrm?.scene.position;
+    if (modelPosition) {
+      await this.turnAnimation?.turnLeft();
+      this.playAction(this._walkAction!);
+      this.targetDirection = modelPosition.clone().add(new THREE.Vector3(1, 0, 0)); 
+    }
+    return this.handleMovement();
+  }
+
+  public async walkRight(currentAction?: THREE.AnimationAction): Promise<THREE.AnimationAction> {
+    this._currentAction = currentAction;
+
+    const modelPosition = this.vrm?.scene.position;
+    if (modelPosition) {
+      await this.turnAnimation?.turnRight();
+      this.playAction(this._walkAction!);
+      this.targetDirection = modelPosition.clone().add(new THREE.Vector3(-1, 0, 0));
+    }
+    return this.handleMovement();
+  }
+
+  // Common function to handle movement after walk is complete
+  private handleMovement(): Promise<THREE.AnimationAction> {
+    return new Promise<THREE.AnimationAction>((resolve) => {
+      const checkMovement = () => {
+        if (!this.targetDirection) {
+          resolve(this._currentAction!);
+        } else {
+          requestAnimationFrame(checkMovement);
+        }
+      };
+      checkMovement();
+    });
+  }
+
+  // Move the model based on the given direction
+  private moveModel(direction: THREE.Vector3) {
+    const modelPosition = this.vrm?.scene.position;
+    if (modelPosition) {
+      const step = direction.multiplyScalar(0.01);
+      modelPosition.add(step);
+    }
+  }
+
+  // TODO: Move the model within update function (Auto Walk)
   public async autoWalk(currentAction?: THREE.AnimationAction): Promise<THREE.AnimationAction> {
     this._currentAction = currentAction;
 
@@ -76,8 +152,7 @@ export class WalkAnimation {
         this.playAction(this._walkAction!);
 
         // Move the model step by step towards the target
-        const step = directionToTarget.multiplyScalar(0.01);
-        modelPosition.add(step); // Move the model
+        this.moveModel(directionToTarget);
       } else if (distanceToTarget <= 0.05) {
         // Idle state only when the model is well within the target range (buffer applied)
         this.turnAnimation?.autoTurn('idle');
@@ -131,13 +206,28 @@ export class WalkAnimation {
     }
   }
 
-  public update(
-    delta: number,
-    xr?: THREE.WebXRManager,
-    camera?: THREE.PerspectiveCamera,
-  ) {
+  
+  public update(delta: number, xr?: THREE.WebXRManager, camera?: THREE.PerspectiveCamera) {
     this.xr = xr;
     this.camera = camera;
     this.checkUserMovement();
+  
+    if (this.targetDirection && this.vrm) {
+      const modelPosition = this.vrm?.scene.position;
+      if (modelPosition) {
+        // Calculate the step size based on walk speed and delta time
+        const step = this.targetDirection.clone().sub(modelPosition).normalize().multiplyScalar(this.walkSpeed * delta);
+        
+        // Move the model towards the target direction
+        modelPosition.add(step);
+  
+        // Check if the target has been reached (if close enough, stop movement)
+        if (modelPosition.distanceTo(this.targetDirection) < 0.1) {
+          this.targetDirection = null;
+          this.playAction(this._idleAction!);
+        }
+      }
+    }
   }
+  
 }
