@@ -100,6 +100,83 @@ const amicaBones: VRMHumanBoneName[] = [
 ];
 
 
+import { XRControllerModelFactory } from './XRControllerModelFactory';
+import { XRHandModelFactory } from './XRHandModelFactory';
+import { Model } from "./model";
+import { Room } from "./room";
+
+// Add the extension functions
+THREE.Mesh.prototype.raycast = acceleratedRaycast;
+THREE.BatchedMesh.prototype.raycast = acceleratedRaycast;
+
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
+
+THREE.BatchedMesh.prototype.computeBoundsTree = computeBatchedBoundsTree;
+THREE.BatchedMesh.prototype.disposeBoundsTree = disposeBatchedBoundsTree;
+
+const joints = [
+  'wrist',
+  'thumb-metacarpal',
+  'thumb-phalanx-proximal',
+  'thumb-phalanx-distal',
+  'thumb-tip',
+  'index-finger-metacarpal',
+  'index-finger-phalanx-proximal',
+  'index-finger-phalanx-intermediate',
+  'index-finger-phalanx-distal',
+  'index-finger-tip',
+  'middle-finger-metacarpal',
+  'middle-finger-phalanx-proximal',
+  'middle-finger-phalanx-intermediate',
+  'middle-finger-phalanx-distal',
+  'middle-finger-tip',
+  'ring-finger-metacarpal',
+  'ring-finger-phalanx-proximal',
+  'ring-finger-phalanx-intermediate',
+  'ring-finger-phalanx-distal',
+  'ring-finger-tip',
+  'pinky-finger-metacarpal',
+  'pinky-finger-phalanx-proximal',
+  'pinky-finger-phalanx-intermediate',
+  'pinky-finger-phalanx-distal',
+  'pinky-finger-tip',
+];
+
+const amicaBones: VRMHumanBoneName[] = [
+ 'hips',
+ 'spine',
+ 'chest',
+ 'upperChest',
+ 'neck',
+
+ 'head',
+ 'leftEye',
+ 'rightEye',
+ 'jaw',
+
+ 'leftUpperLeg',
+ 'leftLowerLeg',
+ 'leftFoot',
+ 'leftToes',
+
+ 'rightUpperLeg',
+ 'rightLowerLeg',
+ 'rightFoot',
+ 'rightToes',
+
+ 'leftShoulder',
+ 'leftUpperArm',
+ 'leftLowerArm',
+ 'leftHand',
+
+ 'rightShoulder',
+ 'rightUpperArm',
+ 'rightLowerArm',
+ 'rightHand',
+];
+
+
 /**
  * three.jsを使った3Dビューワー
  *

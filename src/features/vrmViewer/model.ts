@@ -174,6 +174,7 @@ export class Model {
    * https://github.com/vrm-c/vrm-specification/blob/master/specification/VRMC_vrm_animation-1.0/README.ja.md
    */
 
+
   public async playEmotion(expression: string) {
     this.emoteController?.playEmotion(expression);
   }
