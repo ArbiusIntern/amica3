@@ -1,19 +1,13 @@
 import * as THREE from "three";
 import { VRM } from "@pixiv/three-vrm";
-import { fadeToAction, registerAction } from "./animationUtils";
-import { AnimationController } from "./animationController";
-import { wait } from "@/utils/wait";
+import { registerAction } from "./animationUtils";
 
-// Rotation speed
-const faceUserSpeed = 0.2;
-const faceNewCenterSpeed = 0.2;
 
 // Amplify the pitch angle for more pronounced tilt effect, This factor control the pitch intensity
 const pitchAmplificationFactor = 1.5;
 
 export class TurnAnimation {
   private vrm: VRM;
-  private mixer: THREE.AnimationMixer;
 
   public xr?: THREE.WebXRManager;
   public camera?: THREE.PerspectiveCamera;
@@ -24,50 +18,11 @@ export class TurnAnimation {
 
   private _targetPosition?: THREE.Vector3;
 
-  private _idleAction?: THREE.AnimationAction | null;
-  private _leftAction?: THREE.AnimationAction | null;
-  private _rightAction?: THREE.AnimationAction | null;
-  public _currentAction?: THREE.AnimationAction | null;
-
   private targetQuaternion: THREE.Quaternion | null = null;
   private rotationSpeed = 3;
 
-  constructor(vrm: VRM, mixer: THREE.AnimationMixer) {
+  constructor(vrm: VRM) {
     this.vrm = vrm;
-    this.mixer = mixer;
-    this.registerAction();
-  }
-
-  public async registerAction() {
-    this._leftAction = await registerAction(
-      "/animations/leftTurn.fbx",
-      this.mixer,
-      this.vrm,
-    );
-    Object.assign(this._leftAction!, {
-      clampWhenFinished: true,
-      loop: THREE.LoopOnce,
-    });
-
-    this._rightAction = await registerAction(
-      "/animations/rightTurn.fbx",
-      this.mixer,
-      this.vrm,
-    );
-    Object.assign(this._rightAction!, {
-      clampWhenFinished: true,
-      loop: THREE.LoopOnce,
-    });
-
-    this._idleAction = await registerAction(
-      "/animations/idle.fbx",
-      this.mixer,
-      this.vrm,
-    );
-    Object.assign(this._idleAction!, {
-      clampWhenFinished: true,
-      loop: THREE.LoopRepeat,
-    });
   }
 
   // Common function to handle movement after turn is complete
@@ -152,28 +107,7 @@ export class TurnAnimation {
     return this.handleMovement();
   }
 
-  public async faceUser() {
-    const modelPosition = this.vrm?.scene.position;
-    if (modelPosition) {
-      const idleRotateQuaternion: THREE.Quaternion = new THREE.Quaternion();
-      const idleAngleYCameraDirection = Math.atan2(
-        this.camera?.position.x! - modelPosition.x,
-        this.camera?.position.z! - modelPosition.z,
-      );
-
-      idleRotateQuaternion.setFromAxisAngle(
-        new THREE.Vector3(0, 1, 0),
-        idleAngleYCameraDirection + Math.PI,
-      );
-
-      this.vrm?.scene.quaternion.rotateTowards(
-        idleRotateQuaternion,
-        faceUserSpeed,
-      );
-    }
-  }
-
-  public async faceNewCenter() {
+  public async autoTurn() {
     const modelPosition = this.vrm?.scene.position;
     if (modelPosition) {
       const walkTargetDirection = this._targetPosition!.clone()
@@ -208,19 +142,9 @@ export class TurnAnimation {
       walkRotateQuaternion.multiply(pitchQuaternion); // Combine pitch and yaw for walking
 
       // Rotate the model using the final rotation quaternion
-      this.vrm?.scene.quaternion.rotateTowards(
-        walkRotateQuaternion,
-        faceNewCenterSpeed,
-      );
+      this.targetQuaternion = walkRotateQuaternion;
     }
-  }
-
-  public autoTurn(state: "walk" | "idle") {
-    if (state === "walk") {
-      this.faceNewCenter();
-    } else {
-      this.faceUser();
-    }
+    return this.handleMovement();
   }
 
   private async checkUserMovement() {

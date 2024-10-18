@@ -2,11 +2,10 @@ import * as THREE from "three";
 import { VRM } from "@pixiv/three-vrm";
 import { VRMAnimation } from "@/lib/VRMAnimation/VRMAnimation";
 import { WalkAnimation } from "./walkAnimation";
-import { loadMixamoAnimation } from "@/lib/VRMAnimation/loadMixamoAnimation";
 import { clipAnimation, fadeToAction, modifyAnimationPosition } from "./animationUtils";
 import { TurnAnimation } from "./turnAnimation";
 
-
+// TODO: Fix animation positioning for transition between VRMA and Mixamo animation
 export class AnimationController {
   public vrm?: VRM;
   public mixer?: THREE.AnimationMixer;
@@ -20,34 +19,32 @@ export class AnimationController {
     this.vrm = vrm;
     this.mixer = new THREE.AnimationMixer(vrm.scene);
 
-    this.turnAnimation = new TurnAnimation(vrm, this.mixer);
+    this.turnAnimation = new TurnAnimation(vrm);
     this.walkAnimation = new WalkAnimation(vrm, this.mixer, this.turnAnimation);
   }
 
-  public async playTurn(state: "left" | "right" | "up" | "down" | "user") {
+  // Play turn animation to the desire direction
+  public async playTurn(state: "left" | "right" | "up" | "down") {
     switch (state) {
       case "left":
-        this.turnAnimation?.turnLeft()
+        await this.turnAnimation?.turnLeft();
         break;
 
       case "right":
-        this.turnAnimation?.turnRight()
-        break;
-
-      case "up":
-        this.turnAnimation?.turnUp()
+        await this.turnAnimation?.turnRight();
         break;
 
       case "down":
-        this.turnAnimation?.turnDown()
+        await this.turnAnimation?.turnDown();
         break;
     
       default:
-        this.turnAnimation?.faceUser()
+        await this.turnAnimation?.turnUp();
         break;
     }
   }
 
+  // Play walk animation to the desire direction
   public async playWalk(state?: "left" | "right" | "up" | "down" | "auto") {
     switch (state) {
       case "left":

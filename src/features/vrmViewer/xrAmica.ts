@@ -34,18 +34,11 @@ export class XRAmica {
     }
 
     public async play() {
-        await this.viewer?.model?.animationController?.playWalk("up")
-        // await this.viewer?.model?.animationController?.playTurn("down");
+        await this.viewer?.model?.animationController?.playWalk()
+        // await this.viewer?.model?.animationController?.playTurn();
     }
 
     public async update() {
-        // Play auto walk animation
-        // await this.viewer?.model?.animationController?.playWalk();
-        
-        // this.viewer?.model?.animationController?.playTurn("left");
-
-        // this.viewer?.model?.animationController.
-
         // Processing render scene
         // if (!isVisionProcessing()) {
         //     await this.getScreenshot(); // Wait for the screenshot to be processed

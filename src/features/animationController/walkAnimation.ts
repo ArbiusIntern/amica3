@@ -15,7 +15,6 @@ export class WalkAnimation {
   private _userPosition?: THREE.Vector3;
   private _userDirection?: THREE.Vector3;
   private _userRotation?: THREE.Quaternion;
-  private _previousDirection?: THREE.Vector3;
 
   private _targetPosition?: THREE.Vector3;
 
@@ -34,7 +33,6 @@ export class WalkAnimation {
     this.registerAction()
 
     this.turnAnimation = turnAnimation;
-    this._previousDirection = new THREE.Vector3(0, 0, -1);
   }
 
   public async registerAction() {
@@ -123,43 +121,16 @@ export class WalkAnimation {
     });
   }
 
-  // Move the model based on the given direction
-  private moveModel(direction: THREE.Vector3) {
-    const modelPosition = this.vrm?.scene.position;
-    if (modelPosition) {
-      const step = direction.multiplyScalar(0.01);
-      modelPosition.add(step);
-    }
-  }
-
-  // TODO: Move the model within update function (Auto Walk)
   public async autoWalk(currentAction?: THREE.AnimationAction): Promise<THREE.AnimationAction> {
     this._currentAction = currentAction;
 
     const modelPosition = this.vrm?.scene.position; // Current position of the model
     if (modelPosition) {
-      const directionToTarget = this._targetPosition!
-        .clone()
-        .sub(modelPosition)
-        .normalize(); // Calculate direction to target
-      const distanceToTarget = modelPosition.distanceTo(this._targetPosition!);
-
-      this._previousDirection!.copy(directionToTarget);
-
-      if (distanceToTarget > 0.05 + 0.01) {
-        // Walking state: Rotate towards the target position in all axes
-        this.turnAnimation?.autoTurn('walk');
-        this.playAction(this._walkAction!);
-
-        // Move the model step by step towards the target
-        this.moveModel(directionToTarget);
-      } else if (distanceToTarget <= 0.05) {
-        // Idle state only when the model is well within the target range (buffer applied)
-        this.turnAnimation?.autoTurn('idle');
-        this.playAction(this._idleAction!);
-      }
+      await this.turnAnimation?.autoTurn();
+      this.playAction(this._walkAction!);
+      this.targetDirection = this._targetPosition!.clone().sub(modelPosition).normalize();
     }
-    return this._currentAction!;
+    return this.handleMovement();
   }
 
   private async checkUserMovement() {
@@ -177,7 +148,7 @@ export class WalkAnimation {
 
       this._targetPosition = cameraPosition
         .clone()
-        .add(userDirection.multiplyScalar(2));
+        .add(userDirection.multiplyScalar(5));
     }
   }
 
@@ -222,8 +193,9 @@ export class WalkAnimation {
         modelPosition.add(step);
   
         // Check if the target has been reached (if close enough, stop movement)
-        if (modelPosition.distanceTo(this.targetDirection) < 0.1) {
+        if (modelPosition.distanceTo(this.targetDirection) < 0.01) {
           this.targetDirection = null;
+          this.turnAnimation?.turnUp();
           this.playAction(this._idleAction!);
         }
       }
