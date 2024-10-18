@@ -42,7 +42,7 @@ export async function askLLM(
 
   // Function to simulate fetching chat response stream based on the selected backend
   const getChatResponseStream = async (messages: Message[]) => {
-    console.debug("getChatResponseStream", messages);
+    // console.debug("getChatResponseStream", messages);
     const chatbotBackend = config("chatbot_backend");
 
     switch (chatbotBackend) {
