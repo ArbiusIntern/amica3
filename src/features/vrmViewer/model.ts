@@ -1,5 +1,11 @@
 import * as THREE from "three";
-import { VRM, VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
+import {
+  MToonMaterial,
+  MToonMaterialLoaderPlugin,
+  VRM,
+  VRMLoaderPlugin,
+  VRMUtils,
+} from "@pixiv/three-vrm";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { VRMAnimation } from "@/lib/VRMAnimation/VRMAnimation";
 import { VRMLookAtSmootherLoaderPlugin } from "@/lib/VRMLookAtSmootherLoaderPlugin/VRMLookAtSmootherLoaderPlugin";
@@ -40,16 +46,55 @@ export class Model {
     return this.animationController?.playSingleAnimation(animation, modify)!;
   }
 
-  public async loadVRM(url: string): Promise<void> {
+  public async loadVRM(url: string, setLoadingProgress: (progress: string) => void): Promise<void> {
     const loader = new GLTFLoader();
 
     // used for debug rendering
     const helperRoot = new THREE.Group();
     helperRoot.renderOrder = 10000;
 
+    // the type of material to use
+    // should usually be MToonMaterial
+    let materialType: any;
+    switch (config("mtoon_material_type")) {
+      case "mtoon":
+        materialType = MToonMaterial;
+        break;
+      case "mtoon_node":
+        // @ts-ignore
+        const { MToonNodeMaterial } = await import('@pixiv/three-vrm/nodes');
+        materialType = MToonNodeMaterial;
+        break;
+      case "meshtoon":
+        materialType = THREE.MeshToonMaterial;
+        break;
+      case "basic":
+        materialType = THREE.MeshBasicMaterial;
+        break;
+      case "depth":
+        materialType = THREE.MeshDepthMaterial;
+        break;
+      case "normal":
+        materialType = THREE.MeshNormalMaterial;
+        break;
+      default:
+        console.error('mtoon_material_type not found');
+        break;
+    }
+
+    if (config("use_webgpu") === "true") {
+      // create a WebGPU compatible MToonMaterialLoaderPlugin
+      // @ts-ignore
+      // TODO currently MToonNodeMaterial is broken in amica
+      // materialType = MTonNodeMaterial;
+    }
+
     loader.register((parser) => {
       const options: any = {
         lookAtPlugin: new VRMLookAtSmootherLoaderPlugin(parser),
+        mtoonMaterialPlugin: new MToonMaterialLoaderPlugin(parser, {
+          materialType,
+        }),
       };
 
       if (config("debug_gfx") === "true") {
@@ -59,28 +104,62 @@ export class Model {
       return new VRMLoaderPlugin(parser, options);
     });
 
-    const gltf = await loader.loadAsync(url);
+    return new Promise((resolve, reject) => {
+      loader.load(url, (gltf) => {
+        setLoadingProgress("Processing VRM");
 
-    const vrm = (this.vrm = gltf.userData.vrm);
-    vrm.scene.name = "VRMRoot";
+        const vrm = (this.vrm = gltf.userData.vrm);
+        vrm.scene.name = "VRMRoot";
 
-    VRMUtils.removeUnnecessaryVertices(gltf.scene);
-    VRMUtils.removeUnnecessaryJoints(gltf.scene);
+        VRMUtils.removeUnnecessaryVertices(gltf.scene);
+        VRMUtils.removeUnnecessaryJoints(gltf.scene);
 
-    // Disable frustum culling
-    vrm.scene.traverse((obj: THREE.Object3D) => {
-      obj.frustumCulled = false;
-    });
+        const mtoonDebugMode = config('mtoon_debug_mode');
+        vrm.scene.traverse((obj: any) => {
+          obj.frustumCulled = false;
 
-    if (config("debug_gfx") === "true") {
-      vrm.scene.add(helperRoot);
-    }
+          if (mtoonDebugMode !== 'none') {
+            if (obj.material) {
+              if (Array.isArray(obj.material)) {
+                obj.material.forEach((mat: any) => {
+                  if (mat.isMToonMaterial) {
+                    mat.debugMode = mtoonDebugMode;
+                  }
+                });
+              } else {
+                if (obj.material.isMToonMaterial) {
+                  obj.material.debugMode = mtoonDebugMode;
+                }
+              }
+            }
+          }
+        });
+
+        if (config("debug_gfx") === "true") {
+          vrm.scene.add(helperRoot);
+        }
+
+        // TODO this causes helperRoot to be rendered to side
+        // VRMUtils.rotateVRM0(vrm);
+        // hacky fix
+        if (vrm.meta?.metaVersion === '0') {
+          vrm.scene.rotation.y = Math.PI;
+          helperRoot.rotation.y = Math.PI;
+        }
+
+
+        this.mixer = new THREE.AnimationMixer(vrm.scene);
+        this.animationController = new AnimationController(vrm);
 
     this.emoteController = new EmoteController(vrm, this._lookAtTargetParent);
-    this.animationController = new AnimationController(vrm);
 
-    // TODO this causes helperRoot to be rendered to side
-    VRMUtils.rotateVRM0(vrm);
+        resolve();
+      }, (xhr) => {
+        setLoadingProgress(`${Math.floor(xhr.loaded / xhr.total * 10000)/100}% loaded`);
+      }, (error) => {
+        reject(error);
+      });
+    });
   }
 
   public unLoadVrm() {
@@ -95,7 +174,6 @@ export class Model {
    *
    * https://github.com/vrm-c/vrm-specification/blob/master/specification/VRMC_vrm_animation-1.0/README.ja.md
    */
-  
 
   public async playEmotion(expression: string) {
     this.emoteController?.playEmotion(expression);

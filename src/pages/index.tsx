@@ -7,7 +7,6 @@ import {
 import Link from "next/link";
 import { Menu, Transition } from '@headlessui/react'
 import { clsx } from "clsx";
-import { Montserrat } from "next/font/google";
 import { useTranslation, Trans } from 'react-i18next';
 import {
   ChatBubbleLeftIcon,
@@ -57,12 +56,6 @@ import { ChatModeText } from "@/components/chatModeText";
 
 import { TimestampedPrompt } from "@/features/amicaLife/eventHandler";
 
-const montserrat = Montserrat({
-  variable: "--font-montserrat",
-  display: "swap",
-  subsets: ["latin"],
-});
-
 export default function Home() {
   const { t, i18n } = useTranslation();
   const currLang = i18n.resolvedLanguage;
@@ -71,6 +64,7 @@ export default function Home() {
   const { chat: bot } = useContext(ChatContext);
   const { amicaLife: amicaLife } = useContext(AmicaLifeContext);
 
+  const [chatSpeaking, setChatSpeaking] = useState(false);
   const [chatProcessing, setChatProcessing] = useState(false);
   const [chatLog, setChatLog] = useState<Message[]>([]);
   const [assistantMessage, setAssistantMessage] = useState("");
@@ -148,8 +142,8 @@ export default function Home() {
     toggleState(setShowChatMode, [setShowChatLog, setShowSubconciousText]);
   };
 
-  const toggleAR = async () => {
-    console.log('Toggle AR');
+  const toggleXR = async (immersiveType: XRSessionMode) => {
+    console.log('Toggle XR', immersiveType);
 
     if (! window.navigator.xr) {
       console.error("WebXR not supported");
@@ -171,18 +165,20 @@ export default function Home() {
     };
 
     if (viewer.currentSession) {
+      viewer.onSessionEnded();
+
       try {
         await viewer.currentSession.end();
       } catch (err) {
         // some times session already ended not due to user interaction
         console.warn(err);
       }
-      viewer.onSessionEnded();
+
       // @ts-ignore
       if (window.navigator.xr.offerSession !== undefined) {
         // @ts-ignore
-        const session = await navigator.xr?.offerSession('immersive-ar', sessionInit);
-        viewer.onSessionStarted(session);
+        const session = await navigator.xr?.offerSession(immersiveType, sessionInit);
+        viewer.onSessionStarted(session, immersiveType);
       }
       return;
     }
@@ -190,14 +186,15 @@ export default function Home() {
     // @ts-ignore
     if (window.navigator.xr.offerSession !== undefined ) {
       // @ts-ignore
-      const session = await navigator.xr?.offerSession('immersive-ar', sessionInit);
-      viewer.onSessionStarted(session);
+      const session = await navigator.xr?.offerSession(immersiveType, sessionInit);
+      viewer.onSessionStarted(session, immersiveType);
+      return;
     }
 
     try {
       const session = await window.navigator.xr.requestSession('immersive-ar', sessionInit);
 
-      viewer.onSessionStarted(session);
+      viewer.onSessionStarted(session, immersiveType);
     } catch (err) {
       console.error(err);
     }
@@ -215,6 +212,7 @@ export default function Home() {
       setAssistantMessage,
       setShownMessage,
       setChatProcessing,
+      setChatSpeaking,
     );
 
     // TODO remove in future
@@ -229,6 +227,7 @@ export default function Home() {
       viewer,
       bot,
       setSubconciousLogs,
+      chatSpeaking,
     );
   }, [amicaLife, bot, viewer]);
 
@@ -237,7 +236,7 @@ export default function Home() {
   if (!showContent) return <></>;
 
   return (
-    <div className={montserrat.variable}>
+    <div>
       { config("youtube_videoid") !== '' && (
         <div className="fixed video-container w-full h-full z-0">
           <iframe
@@ -346,7 +345,7 @@ export default function Home() {
             <MenuButton
               icon={CubeTransparentIcon}
               disabled={!isARSupported}
-              onClick={() => toggleAR()}
+              onClick={() => toggleXR('immersive-vr')}
               label="Augmented Reality"
             />
 

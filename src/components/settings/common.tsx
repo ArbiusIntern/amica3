@@ -6,6 +6,7 @@ import {
   IdentificationIcon,
   LanguageIcon,
   UsersIcon,
+  CommandLineIcon,
   RocketLaunchIcon,
   FaceSmileIcon,
   MusicalNoteIcon,
@@ -22,6 +23,7 @@ import {
   SwatchIcon,
   MoonIcon,
   SunIcon,
+  CogIcon,
 } from '@heroicons/react/24/outline';
 
 import logo from '/public/logo.png';
@@ -143,6 +145,7 @@ export function getIconFromPage(page: string): JSX.Element {
     case 'stt':                 return <PencilIcon className="h-5 w-5 flex-none text-gray-800" aria-hidden="true" />;
     case 'vision':              return <EyeIcon className="h-5 w-5 flex-none text-gray-800" aria-hidden="true" />;
     case 'reset_settings':      return <PowerIcon className="h-5 w-5 flex-none text-red-500" aria-hidden="true" />;
+    case 'developer':           return <CommandLineIcon className="h-5 w-5 flex-none text-green-500" aria-hidden="true" />;
     case 'community':           return <RocketLaunchIcon className="h-5 w-5 flex-none text-gray-800" aria-hidden="true" />;
 
     case 'background_img':      return <PhotoIcon className="h-5 w-5 flex-none text-gray-800" aria-hidden="true" />;
@@ -162,9 +165,11 @@ export function getIconFromPage(page: string): JSX.Element {
     case 'tts_backend':         return <SpeakerWaveIcon className="h-5 w-5 flex-none text-gray-800" aria-hidden="true" />;
     case 'elevenlabs_settings': return <AdjustmentsHorizontalIcon className="h-5 w-5 flex-none text-gray-800" aria-hidden="true" />;
     case 'speecht5_settings':   return <AdjustmentsHorizontalIcon className="h-5 w-5 flex-none text-gray-800" aria-hidden="true" />;
-    case 'coqui_settings':      return <AdjustmentsHorizontalIcon className="h-5 w-5 flex-none text-gray-800" aria-hidden="true" />;
     case 'openai_tts_settings': return <AdjustmentsHorizontalIcon className="h-5 w-5 flex-none text-gray-800" aria-hidden="true" />;
     case 'piper_settings': return <AdjustmentsHorizontalIcon className="h-5 w-5 flex-none text-gray-800" aria-hidden="true" />;
+    case 'rvc_settings': return <CogIcon className="h-5 w-5 flex-none text-gray-800" aria-hidden="true" />;
+    case 'coquiLocal_settings': return <AdjustmentsHorizontalIcon className="h-5 w-5 flex-none text-gray-800" aria-hidden="true" />;
+    case 'localXTTS_settings': return <AdjustmentsHorizontalIcon className="h-5 w-5 flex-none text-gray-800" aria-hidden="true" />;
 
     case 'stt_backend':         return <PencilSquareIcon className="h-5 w-5 flex-none text-gray-800" aria-hidden="true" />;
     case 'stt_wake_word':  return <MoonIcon className="h-5 w-5 flex-none text-gray-800" aria-hidden="true" />;
@@ -191,6 +196,7 @@ function getLabelFromPage(page: string): string {
     case 'stt':                 return t('Speech-to-text');
     case 'vision':              return t('Vision');
     case 'reset_settings':      return t('Reset Settings');
+    case 'developer':           return t('Developer');
     case 'community':           return t('Community');
 
     case 'background_img':      return t('Background Image');
@@ -210,9 +216,11 @@ function getLabelFromPage(page: string): string {
     case 'tts_backend':         return t('TTS Backend');
     case 'elevenlabs_settings': return t('ElevenLabs');
     case 'speecht5_settings':   return t('SpeechT5');
-    case 'coqui_settings':      return t('Coqui');
     case 'openai_tts_settings': return t('OpenAI');
     case 'piper_settings':      return t('Piper');
+    case 'rvc_settings':        return t('RVC');
+    case 'coquiLocal_settings': return t('Coqui Local');
+    case 'localXTTS_settings':  return t('Alltalk');
 
     case 'vision_backend':           return t('Vision Backend');
     case 'vision_llamacpp_settings': return t('LLama.cpp');
