@@ -108,7 +108,8 @@ const amicaBones: VRMHumanBoneName[] = [
 export class Viewer {
   public isReady: boolean = false;
   public model?: Model;
-  private xrAmica: XRAmica;
+  public room?: Room;
+  public xrAmica?: XRAmica;
 
   public _renderer?: THREE.WebGLRenderer;
   private _clock: THREE.Clock;
@@ -182,6 +183,8 @@ export class Viewer {
     // animate
     this._clock = new THREE.Clock();
     this._clock.start();
+
+    this.xrAmica = new XRAmica(this);
   }
 
   public async setup(canvas: HTMLCanvasElement) {
@@ -500,6 +503,11 @@ export class Viewer {
 
     this.currentSession = session;
     this.currentSession.addEventListener('end', () => this.onSessionEnded());
+
+    // Temporary double click on screen to trigger single animation 
+    this._renderer.domElement?.parentElement?.addEventListener('dblclick', () => {
+      this.xrAmica?.play();
+  });
   }
 
   public onSessionEnded(/*event*/) {
@@ -551,6 +559,7 @@ export class Viewer {
 
     // gltf and vrm
     this.model = new Model(this._camera || new THREE.Object3D());
+    this.xrAmica = new XRAmica(this);
     await this.model.loadVRM(url, setLoadingProgress);
     setLoadingProgress('VRM loaded');
     if (!this.model?.vrm) return;
@@ -1023,7 +1032,17 @@ export class Viewer {
     let ptime = performance.now();
 
     ptime = performance.now();
-    this.model?.update(delta);
+    if (this.model) {
+      const xr = this._renderer?.xr;
+      const camera = this._camera;
+      if (this.currentSession && xr && camera) {
+        this.model.update(delta, xr, camera);
+        this.xrAmica?.update();
+      } else {
+        this.model.update(delta);
+      }
+      
+    }
     this.modelMsPanel.update(performance.now() - ptime, 40);
 
     ptime = performance.now();

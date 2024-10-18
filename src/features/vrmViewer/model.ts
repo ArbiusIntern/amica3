@@ -150,8 +150,7 @@ export class Model {
 
         this.mixer = new THREE.AnimationMixer(vrm.scene);
         this.animationController = new AnimationController(vrm);
-
-    this.emoteController = new EmoteController(vrm, this._lookAtTargetParent);
+        this.emoteController = new EmoteController(vrm, this._lookAtTargetParent);
 
         resolve();
       }, (xhr) => {

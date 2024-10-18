@@ -14,8 +14,8 @@ import { config } from "@/utils/config";
 
 export const idleEvents = [
   "VRMA",
-  // "Subconcious",
-  // "IdleTextPrompts",
+  "Subconcious",
+  "IdleTextPrompts",
 ] as const;
 
 export const basedPrompt = {
