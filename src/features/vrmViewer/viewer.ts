@@ -99,6 +99,10 @@ const amicaBones: VRMHumanBoneName[] = [
  'rightHand',
 ];
 
+let allPlanes = new Map();
+let intersectObjects = new Map();
+let planeId = 1;
+
 /**
  * three.jsを使った3Dビューワー
  *
@@ -173,6 +177,8 @@ export class Viewer {
   private closestPart2: THREE.Object3D | null = null;
 
   private mouse = new THREE.Vector2();
+
+  public planeMaterial?: THREE.MeshBasicMaterial;
 
   constructor() {
     this.isReady = false;
@@ -464,6 +470,12 @@ export class Viewer {
       scene.add(this.closestPart1);
       scene.add(this.closestPart2);
     }
+
+    this.planeMaterial =   new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      opacity: 1.0,
+      transparent: false,
+    });
 
     window.addEventListener("resize", () => {
       this.resize();
@@ -1013,6 +1025,111 @@ export class Viewer {
     });
   }
 
+  public processPlanes() {
+    const frame = this._renderer?.xr.getFrame();
+    const referenceSpace = this._renderer?.xr.getReferenceSpace();
+
+    if (frame?.detectedPlanes) {
+      console.log(frame.detectedPlanes)
+    }
+    
+
+    if (frame?.detectedPlanes) {
+      allPlanes.forEach((planeContext, plane) => {
+        if (!frame.detectedPlanes?.has(plane)) {
+          // plane was removed
+          allPlanes.delete(plane);
+          intersectObjects.delete(plane)
+          console.debug("Plane no longer tracked, id=" + planeContext.id);
+
+          this._scene?.remove(planeContext.mesh);
+        }
+      });
+
+      frame.detectedPlanes.forEach(plane => {
+        const planePose = frame.getPose(plane.planeSpace, referenceSpace!);
+        let planeMesh;
+
+        if (allPlanes.has(plane)) {
+          // may have been updated:
+          const planeContext = allPlanes.get(plane);
+          planeMesh = planeContext.mesh;
+
+          if (planeContext.timestamp < plane.lastChangedTime) {
+            // updated!
+            planeContext.timestamp = plane.lastChangedTime;
+
+            const geometry = this.createGeometryFromPolygon(plane.polygon);
+            planeContext.mesh.geometry.dispose();
+            planeContext.mesh.geometry = geometry;
+          }
+        } else {
+          // new plane
+          
+          // Create geometry:
+          const geometry = this.createGeometryFromPolygon(plane.polygon);
+          planeMesh = new THREE.Mesh(geometry,this.planeMaterial);
+          const box = new THREE.BoxHelper(planeMesh, 0xff0000);  // Red box to visualize the size
+          this._scene?.add(box);
+
+          console.log("Plane mesh position", planeMesh.position);
+          
+          planeMesh.matrixAutoUpdate = false;
+
+          this._scene?.add(planeMesh);
+
+
+          const planeContext = {
+            id: planeId,
+            timestamp: plane.lastChangedTime,
+            mesh: planeMesh,
+          };
+
+          intersectObjects.set(plane, planeContext)
+          allPlanes.set(plane, planeContext);
+          console.debug("New plane detected, id=" + planeId);
+          planeId++;
+        }
+
+        if (planePose) {
+          console.log('Plane Pose:', planePose);
+          planeMesh.visible = true;
+          planeMesh.matrix.fromArray(planePose.transform.matrix);
+        } else {
+          console.log('No pose found for plane');
+          planeMesh.visible = false;
+        }
+      });
+    }
+  }
+
+  public createGeometryFromPolygon(polygon: { x: number, y: number, z: number }[]): THREE.BufferGeometry {
+    const geometry = new THREE.BufferGeometry();
+  
+    const vertices: number[] = [];
+    const uvs: number[] = [];
+    
+    // Loop through each point in the polygon
+    polygon.forEach(point => {
+      vertices.push(point.x, point.y, point.z);
+      uvs.push(point.x, point.z); // Assuming UVs map x and z coordinates
+    });
+  
+    // Create indices for triangulation
+    const indices: number[] = [];
+    for (let i = 2; i < polygon.length; ++i) {
+      indices.push(0, i - 1, i); // Triangulate the polygon
+    }
+  
+    // Set attributes and index for the geometry
+    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+    geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
+    geometry.setIndex(indices);
+  
+    return geometry;
+  }
+  
+
   public update(time?: DOMHighResTimeStamp, frame?: XRFrame) {
     let utime = performance.now(); // count total update time
 
@@ -1025,6 +1142,9 @@ export class Viewer {
     this.elapsedMsMid += delta;
 
     this.updateHands();
+
+    this.processPlanes();
+
 
     this._stats!.update();
 

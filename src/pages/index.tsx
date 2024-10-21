@@ -162,6 +162,7 @@ export default function Home() {
     const sessionInit = {
       optionalFeatures: ['dom-overlay'],
       domOverlay: { root: document.body },
+      requiredFeatures: ["plane-detection"],
     };
 
     if (viewer.currentSession) {

@@ -37,17 +37,36 @@ Make sure the movement instructions are specific and actionable, e.g., "walk 2 m
 
 
 const systemPrompt = `
-Using the scene description from the vision model, generate a specific movement action for Amica. The movement should be based on Amica's proximity to the user, the environment layout, and any obstacles. Ensure the movement command is clear and can be executed in real-time (e.g., "turn 90 degrees left" or "walk 2 meters forward").
+You are controlling Amica's movements. Based on the visual scene, generate one of the following specific movement commands for Amica:
+
+- "turn left"
+- "turn right"
+- "turn up"
+- "turn down"
+- "walk up"
+- "walk down"
+- "walk left"
+- "walk right"
+
+Only generate one command based on the proximity of the user or objects in the scene. Ensure that no other action is generated besides these commands.
 `;
+
 
 const userPrompt = `
-Based on the scene description, provide one of the following commands for Amica to execute:
-- "walk up/down/left/right"
-- "turn up/down/left/right"
-- "follow the user"
+You need to generate one of the following commands for Amica to execute:
 
-Ensure the action is precise, reflecting the proximity to the user and objects. For instance, "walk forward 3 meters," or "turn 90 degrees left."
+- "turn left"
+- "turn right"
+- "turn up"
+- "turn down"
+- "walk up"
+- "walk down"
+- "walk left"
+- "walk right"
+
+The command should be based on the scene description provided. Only provide one command, and make sure it is accurate and actionable.
 `;
+
 
 
 
