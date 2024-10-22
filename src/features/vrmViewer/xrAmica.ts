@@ -35,8 +35,8 @@ Match the commands based on proximity and object positioning in the scene. For e
 - If the user is directly behind Amica, generate "turn 180 degrees."
 
 Make sure the movement instructions are specific and actionable, e.g., 
-"walk up" or "walk down" or "walk left" or "walk right" or
-"turn up" or "turn down" or "turn left" or "turn right".
+[walk up] or [walk down] or [walk left] or [walk right] or
+[turn up] or [turn down] or [turn left] or [turn right].
 `;
 
 
@@ -51,8 +51,8 @@ Based on the scene description, provide one of the following commands for Amica 
 - "follow the user"
 
 Ensure the action is precise, reflecting the proximity to the user and objects. For instance, 
-"walk up" or "walk down" or "walk left" or "walk right" or
-"turn up" or "turn down" or "turn left" or "turn right".
+[walk up] or [walk down] or [walk left] or [walk right] or
+[turn up] or [turn down] or [turn left] or [turn right].
 `;
 
 
@@ -71,13 +71,20 @@ export class XRAmica {
     private currentSceneResponse?: string;
     private currentSceneImage?: string;
 
+    public isChatSpeaking?: boolean;
+    public isMainChatProcessing?: boolean;
+
     constructor() {
         this.enabled = false;
     }
 
-    public init(viewer: Viewer, chat: Chat) {
+    public init(viewer: Viewer, chat: Chat, isChatSpeaking: boolean, isChatProcessing: boolean) {
         this.viewer = viewer;
         this.chat = chat;
+
+        this.isChatSpeaking = isChatSpeaking
+        this.isMainChatProcessing = isChatProcessing
+
         this.enabled = true;
     }
 
@@ -86,13 +93,16 @@ export class XRAmica {
     }
 
     public async play() {
-        await this.viewer?.model?.animationController?.playWalk()
+        await this.viewer?.model?.animationController?.playWalk("auto")
         // await this.viewer?.model?.animationController?.playTurn();
     }
 
     public async update() {
         // Ensure vision processing is not already happening
-        if (!isVisionProcessing() && !isChatProcessing() && this.enabled) {
+
+        // Main chat, sub vision model, sub chat model isn't currenyly processing and on XR session
+        const playCondition = !isVisionProcessing() && !isChatProcessing() && !this.isChatSpeaking && !this.isMainChatProcessing && this.enabled
+        if (playCondition) {
             try {
                 // Wait for the screenshot to be processed
                 await this.getScreenshot();

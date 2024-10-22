@@ -29,6 +29,12 @@ export const emotions =
 "Shy", "Jealous", "Bored", "Serious", "Suspicious", "Victory", 
 "Sleep", "Love"] as const;
 
+export const animationNames: string[] = [];
+
+export const animations = 
+["walk left", "walk right", "walk up", "walk down", 
+"turn left", "turn right", "turn up", "turn down"] as const;
+
 // Convert user input to system format e.g. ["suspicious"] -> ["Sus"], ["sleep"] -> ["Sleep"]
 const userInputToSystem = (input: string) => {
   const mapping: { [key: string]: string } = {
@@ -42,11 +48,14 @@ const userInputToSystem = (input: string) => {
 
 type EmotionType = (typeof emotions)[number];
 
+type AnimationType = (typeof animations)[number];
+
 /**
  * A set that includes utterances, voice emotions, and model emotional expressions.
  */
 export type Screenplay = {
   expression: EmotionType;
+  animations: AnimationType;
   talk: Talk;
   text: string;
 };
@@ -56,6 +65,7 @@ export const textsToScreenplay = (
 ): Screenplay[] => {
   const screenplays: Screenplay[] = [];
   let prevExpression = "neutral";
+  let prevAnimation = "idle";
   for (let i = 0; i < texts.length; i++) {
     const text = texts[i];
 
@@ -66,6 +76,8 @@ export const textsToScreenplay = (
     const message = text.replace(/\[(.*?)\]/g, "");
 
     let expression = prevExpression;
+    let animation = prevAnimation;
+
     const systemTag = userInputToSystem(tag);
 
     if (emotions.includes(systemTag as any)) {
@@ -74,8 +86,15 @@ export const textsToScreenplay = (
       prevExpression = systemTag;
     }
 
+    if (animations.includes(tag as any)) {
+      // console.log("Animation detect :",tag);
+      animation = tag;
+      prevAnimation = tag;
+    }
+
     screenplays.push({
       expression: expression as EmotionType,
+      animations: animation as AnimationType,
       talk: {
         style: emotionToTalkStyle(expression as EmotionType),
         message: message,

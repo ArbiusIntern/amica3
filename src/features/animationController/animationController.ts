@@ -25,6 +25,7 @@ export class AnimationController {
 
   // Play turn animation to the desire direction
   public async playTurn(state: "left" | "right" | "up" | "down") {
+    console.log(`turn ${state}`)
     switch (state) {
       case "left":
         await this.turnAnimation?.turnLeft();
@@ -45,7 +46,8 @@ export class AnimationController {
   }
 
   // Play walk animation to the desire direction
-  public async playWalk(state?: "left" | "right" | "up" | "down" | "auto") {
+  public async playWalk(state: "left" | "right" | "up" | "down" | "auto") {
+    console.log(`walk ${state}`)
     switch (state) {
       case "left":
         this._currentAction = await this.walkAnimation?.walkLeft(this._currentAction!)
@@ -67,6 +69,28 @@ export class AnimationController {
         this._currentAction = await this.walkAnimation?.autoWalk(this._currentAction!);
         break;
     }
+  }
+
+  public playAnimation(name: string) {
+    const [type, direction] = name.split(" ");
+
+    const validWalkDirections = ["left", "right", "up", "down", "auto"] as const;
+    const validTurnDirections = ["left", "right", "up", "down"] as const;
+
+  
+    switch (type) {
+      case "walk":
+          this.playWalk(direction as typeof validWalkDirections[number]);
+        break;
+
+      case "turn":
+          this.playTurn(direction as typeof validTurnDirections[number]);
+        break;
+        
+      default:
+        console.error("Invalid type:", type);
+        break;
+      }
   }
 
   // Play single animation 

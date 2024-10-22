@@ -207,6 +207,8 @@ export default function Home() {
     xrAmica.init(
       viewer,
       bot,
+      chatSpeaking,
+      chatProcessing,
     );
   })
 
