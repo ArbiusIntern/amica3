@@ -65,7 +65,7 @@ export const textsToScreenplay = (
 ): Screenplay[] => {
   const screenplays: Screenplay[] = [];
   let prevExpression = "neutral";
-  let prevAnimation = "idle";
+  let prevAnimation = "turn up"; // Face user
   for (let i = 0; i < texts.length; i++) {
     const text = texts[i];
 

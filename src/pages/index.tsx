@@ -210,7 +210,7 @@ export default function Home() {
       chatSpeaking,
       chatProcessing,
     );
-  })
+  }, [bot, viewer]);
 
 
   useEffect(() => {

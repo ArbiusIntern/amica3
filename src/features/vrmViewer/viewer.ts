@@ -957,7 +957,7 @@ export class Viewer {
           closestPart.position.copy(closestBone.getWorldPosition(vec3));
           closestPart.scale.setScalar(0.1);
           closestPart.visible = true;
-          console.log('closest bone', closestname);
+          // console.log('closest bone', closestname);
         }
       }
 
