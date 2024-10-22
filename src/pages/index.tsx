@@ -55,6 +55,7 @@ import { AmicaLifeContext } from "@/features/amicaLife/amicaLifeContext";
 import { ChatModeText } from "@/components/chatModeText";
 
 import { TimestampedPrompt } from "@/features/amicaLife/eventHandler";
+import { XRAmicaContext } from "@/features/vrmViewer/xrAmicaContext";
 
 export default function Home() {
   const { t, i18n } = useTranslation();
@@ -63,6 +64,7 @@ export default function Home() {
   const { alert } = useContext(AlertContext);
   const { chat: bot } = useContext(ChatContext);
   const { amicaLife: amicaLife } = useContext(AmicaLifeContext);
+  const { xrAmica: xrAmica } = useContext(XRAmicaContext);
 
   const [chatSpeaking, setChatSpeaking] = useState(false);
   const [chatProcessing, setChatProcessing] = useState(false);
@@ -162,7 +164,7 @@ export default function Home() {
     const sessionInit = {
       optionalFeatures: ['dom-overlay'],
       domOverlay: { root: document.body },
-      requiredFeatures: ["plane-detection"],
+      // requiredFeatures: ["plane-detection"],
     };
 
     if (viewer.currentSession) {
@@ -179,7 +181,7 @@ export default function Home() {
       if (window.navigator.xr.offerSession !== undefined) {
         // @ts-ignore
         const session = await navigator.xr?.offerSession(immersiveType, sessionInit);
-        viewer.onSessionStarted(session, immersiveType);
+        viewer.onSessionStarted(session, immersiveType, xrAmica);
       }
       return;
     }
@@ -188,19 +190,25 @@ export default function Home() {
     if (window.navigator.xr.offerSession !== undefined ) {
       // @ts-ignore
       const session = await navigator.xr?.offerSession(immersiveType, sessionInit);
-      viewer.onSessionStarted(session, immersiveType);
+      viewer.onSessionStarted(session, immersiveType, xrAmica);
       return;
     }
 
     try {
       const session = await window.navigator.xr.requestSession('immersive-ar', sessionInit);
 
-      viewer.onSessionStarted(session, immersiveType);
+      viewer.onSessionStarted(session, immersiveType, xrAmica);
     } catch (err) {
       console.error(err);
     }
-
   }
+
+  useEffect(() => {
+    xrAmica.init(
+      viewer,
+      bot,
+    );
+  })
 
 
   useEffect(() => {

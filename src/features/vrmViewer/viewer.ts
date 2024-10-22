@@ -188,8 +188,6 @@ export class Viewer {
     // animate
     this._clock = new THREE.Clock();
     this._clock.start();
-
-    this.xrAmica = new XRAmica(this);
   }
 
   public async setup(canvas: HTMLCanvasElement) {
@@ -491,9 +489,11 @@ export class Viewer {
     return this._renderer?.domElement?.parentElement?.getElementsByTagName("canvas")[0];
   }
 
-  public async onSessionStarted(session: XRSession, immersiveType: XRSessionMode) {
+  public async onSessionStarted(session: XRSession, immersiveType: XRSessionMode, xrAmica: XRAmica) {
     if (! this._renderer) return;
     console.log('session', session);
+
+    this.xrAmica = xrAmica;
 
     const canvas = this.getCanvas();
     // TODO this needs to be set to none to prevent double render breaking the compositing
@@ -518,7 +518,8 @@ export class Viewer {
     // Temporary double click on screen to trigger single animation 
     this._renderer.domElement?.parentElement?.addEventListener('dblclick', () => {
       this.xrAmica?.play();
-  });
+    });
+    this.xrAmica.setEnabled(true);
   }
 
   public onSessionEnded(/*event*/) {
@@ -542,6 +543,8 @@ export class Viewer {
     this.igroup!.visible = false;
     this._floor!.visible = false;
     this.handGroup.visible = false;
+
+    this.xrAmica?.setEnabled(false);
   }
 
   public teleport(x: number, y: number, z: number) {
@@ -570,7 +573,6 @@ export class Viewer {
 
     // gltf and vrm
     this.model = new Model(this._camera || new THREE.Object3D());
-    this.xrAmica = new XRAmica(this);
     await this.model.loadVRM(url, setLoadingProgress);
     setLoadingProgress('VRM loaded');
     if (!this.model?.vrm) return;
@@ -1143,7 +1145,7 @@ export class Viewer {
 
     this.updateHands();
 
-    this.processPlanes();
+    // this.processPlanes();
 
 
     this._stats!.update();

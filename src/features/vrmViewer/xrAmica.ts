@@ -3,6 +3,8 @@ import { Viewer } from "./viewer";
 import { askLLM, askVisionLLM, isChatProcessing, isVisionProcessing } from "@/utils/askLlm";
 import * as THREE from "three";
 import { Message } from "../chat/messages";
+import { Chat } from "../chat/chat";
+import { wait } from "@/utils/wait";
 
 // System Vision Prompt for describing the AR scene
 const systemVisionPrompt = `
@@ -32,41 +34,26 @@ Match the commands based on proximity and object positioning in the scene. For e
 - If Amica is 2 meters away from an object or user, you may generate "walk 2 meters forward."
 - If the user is directly behind Amica, generate "turn 180 degrees."
 
-Make sure the movement instructions are specific and actionable, e.g., "walk 2 meters forward," or "turn left 90 degrees."
+Make sure the movement instructions are specific and actionable, e.g., 
+"walk up" or "walk down" or "walk left" or "walk right" or
+"turn up" or "turn down" or "turn left" or "turn right".
 `;
 
 
 const systemPrompt = `
-You are controlling Amica's movements. Based on the visual scene, generate one of the following specific movement commands for Amica:
-
-- "turn left"
-- "turn right"
-- "turn up"
-- "turn down"
-- "walk up"
-- "walk down"
-- "walk left"
-- "walk right"
-
-Only generate one command based on the proximity of the user or objects in the scene. Ensure that no other action is generated besides these commands.
+Using the scene description from the vision model, generate a specific movement action for Amica. The movement should be based on Amica's proximity to the user, the environment layout, and any obstacles. Ensure the movement command is clear and can be executed in real-time (e.g., "turn 90 degrees left" or "walk 2 meters forward").
 `;
-
 
 const userPrompt = `
-You need to generate one of the following commands for Amica to execute:
+Based on the scene description, provide one of the following commands for Amica to execute:
+- "walk up/down/left/right"
+- "turn up/down/left/right"
+- "follow the user"
 
-- "turn left"
-- "turn right"
-- "turn up"
-- "turn down"
-- "walk up"
-- "walk down"
-- "walk left"
-- "walk right"
-
-The command should be based on the scene description provided. Only provide one command, and make sure it is accurate and actionable.
+Ensure the action is precise, reflecting the proximity to the user and objects. For instance, 
+"walk up" or "walk down" or "walk left" or "walk right" or
+"turn up" or "turn down" or "turn left" or "turn right".
 `;
-
 
 
 
@@ -77,13 +64,25 @@ const visionPrompt: Message[] = [
 
 export class XRAmica {
     private viewer?: Viewer;
+    private chat?: Chat;
+    public enabled: boolean;
 
     private currentResponse?: string;
     private currentSceneResponse?: string;
     private currentSceneImage?: string;
 
-    constructor(viewer: Viewer) {
+    constructor() {
+        this.enabled = false;
+    }
+
+    public init(viewer: Viewer, chat: Chat) {
         this.viewer = viewer;
+        this.chat = chat;
+        this.enabled = true;
+    }
+
+    public setEnabled(bool: boolean) {
+        (bool) ? this.enabled = true : this.enabled = false;
     }
 
     public async play() {
@@ -92,11 +91,25 @@ export class XRAmica {
     }
 
     public async update() {
-        // Processing render scene
-        if (!isVisionProcessing()) {
-            await this.getScreenshot(); // Wait for the screenshot to be processed
-            await this.handleVisionResponse(); // Then handle the response
-            await this.handleLLMResponse();
+        // Ensure vision processing is not already happening
+        if (!isVisionProcessing() && !isChatProcessing() && this.enabled) {
+            try {
+                // Wait for the screenshot to be processed
+                await this.getScreenshot();
+                
+                // Wait for the vision response to be processed
+                await this.handleVisionResponse();
+                
+                // Once vision response is processed, handle LLM response
+                await this.handleLLMResponse();
+
+                wait(5000);
+                
+            } catch (error) {
+                console.error("Error during the update process:", error);
+            }
+        } else {
+            // console.log("Processing is already in progress.");
         }
     }
 
@@ -138,7 +151,7 @@ export class XRAmica {
 
     private async handleLLMResponse() {
         if (this.currentSceneResponse && !isChatProcessing()) { // Ensure image is available
-            this.currentResponse = await askLLM(systemPrompt, userPrompt,null);
+            this.currentResponse = await askLLM(systemPrompt, userPrompt, this.chat!);
             console.log("Model response:", this.currentResponse); // Log the response for debugging
         } else {
             console.error("No current scene reesponse or chat is processing.");
