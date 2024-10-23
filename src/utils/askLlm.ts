@@ -127,13 +127,8 @@ export async function askLLM(
           rolePlay,
           callback: (aiTalks: Screenplay[]): boolean => {
             // Generate & play audio for each sentence, display responses
-            console.debug("enqueue tts", aiTalks);
-            console.debug(
-              "streamIdx",
-              currentStreamIdx,
-              "currentStreamIdx",
-              chat.currentStreamIdx,
-            );
+            // console.debug('enqueue tts', aiTalks);
+            // console.debug('streamIdx', currentStreamIdx, 'currentStreamIdx', chat.currentStreamIdx)
             if (currentStreamIdx !== chat.currentStreamIdx) {
               console.log("wrong stream idx");
               return true; // should break

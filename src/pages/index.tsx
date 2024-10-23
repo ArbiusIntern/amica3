@@ -181,7 +181,7 @@ export default function Home() {
       if (window.navigator.xr.offerSession !== undefined) {
         // @ts-ignore
         const session = await navigator.xr?.offerSession(immersiveType, sessionInit);
-        viewer.onSessionStarted(session, immersiveType, xrAmica);
+        viewer.onSessionStarted(session, immersiveType);
       }
       return;
     }
@@ -190,14 +190,14 @@ export default function Home() {
     if (window.navigator.xr.offerSession !== undefined ) {
       // @ts-ignore
       const session = await navigator.xr?.offerSession(immersiveType, sessionInit);
-      viewer.onSessionStarted(session, immersiveType, xrAmica);
+      viewer.onSessionStarted(session, immersiveType);
       return;
     }
 
     try {
       const session = await window.navigator.xr.requestSession('immersive-ar', sessionInit);
 
-      viewer.onSessionStarted(session, immersiveType, xrAmica);
+      viewer.onSessionStarted(session, immersiveType);
     } catch (err) {
       console.error(err);
     }

@@ -7,24 +7,30 @@ import {
   acceleratedRaycast,
   MeshBVHHelper,
   StaticGeometryGenerator,
-} from 'three-mesh-bvh';
-import { GenerateMeshBVHWorker } from '@/workers/bvh/GenerateMeshBVHWorker';
-import { WorkerBase } from '@/workers/bvh/utils/WorkerBase';
-import { VRMHumanBoneName } from '@pixiv/three-vrm';
-import GUI from 'lil-gui';
-import Stats from 'stats.js';
+} from "three-mesh-bvh";
+import { GenerateMeshBVHWorker } from "@/workers/bvh/GenerateMeshBVHWorker";
+import { WorkerBase } from "@/workers/bvh/utils/WorkerBase";
+import {
+    BatchedParticleRenderer,
+    QuarksLoader,
+    QuarksUtil,
+} from 'three.quarks';
 
-import { InteractiveGroup } from 'three/examples/jsm/interactive/InteractiveGroup.js';
-import { HTMLMesh } from 'three/examples/jsm/interactive/HTMLMesh.js';
+import { VRMHumanBoneName } from "@pixiv/three-vrm";
+import GUI from "lil-gui";
+import Stats from "stats.js";
+
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import { InteractiveGroup } from "three/examples/jsm/interactive/InteractiveGroup.js";
+import { HTMLMesh } from "three/examples/jsm/interactive/HTMLMesh.js";
 
 import { loadVRMAnimation } from "@/lib/VRMAnimation/loadVRMAnimation";
 import { loadMixamoAnimation } from "@/lib/VRMAnimation/loadMixamoAnimation";
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { config } from "@/utils/config";
 import { XRAmica } from "./xrAmica";
 
-import { XRControllerModelFactory } from './XRControllerModelFactory';
-import { XRHandModelFactory } from './XRHandModelFactory';
+import { XRControllerModelFactory } from "./XRControllerModelFactory";
+import { XRHandModelFactory } from "./XRHandModelFactory";
 import { Model } from "./model";
 import { Room } from "./room";
 
@@ -38,70 +44,66 @@ THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
 THREE.BatchedMesh.prototype.computeBoundsTree = computeBatchedBoundsTree;
 THREE.BatchedMesh.prototype.disposeBoundsTree = disposeBatchedBoundsTree;
 
-const joints = [
-  'wrist',
-  'thumb-metacarpal',
-  'thumb-phalanx-proximal',
-  'thumb-phalanx-distal',
-  'thumb-tip',
-  'index-finger-metacarpal',
-  'index-finger-phalanx-proximal',
-  'index-finger-phalanx-intermediate',
-  'index-finger-phalanx-distal',
-  'index-finger-tip',
-  'middle-finger-metacarpal',
-  'middle-finger-phalanx-proximal',
-  'middle-finger-phalanx-intermediate',
-  'middle-finger-phalanx-distal',
-  'middle-finger-tip',
-  'ring-finger-metacarpal',
-  'ring-finger-phalanx-proximal',
-  'ring-finger-phalanx-intermediate',
-  'ring-finger-phalanx-distal',
-  'ring-finger-tip',
-  'pinky-finger-metacarpal',
-  'pinky-finger-phalanx-proximal',
-  'pinky-finger-phalanx-intermediate',
-  'pinky-finger-phalanx-distal',
-  'pinky-finger-tip',
+const joints: string[] = [
+  "wrist",
+  "thumb-metacarpal",
+  "thumb-phalanx-proximal",
+  "thumb-phalanx-distal",
+  "thumb-tip",
+  "index-finger-metacarpal",
+  "index-finger-phalanx-proximal",
+  "index-finger-phalanx-intermediate",
+  "index-finger-phalanx-distal",
+  "index-finger-tip",
+  "middle-finger-metacarpal",
+  "middle-finger-phalanx-proximal",
+  "middle-finger-phalanx-intermediate",
+  "middle-finger-phalanx-distal",
+  "middle-finger-tip",
+  "ring-finger-metacarpal",
+  "ring-finger-phalanx-proximal",
+  "ring-finger-phalanx-intermediate",
+  "ring-finger-phalanx-distal",
+  "ring-finger-tip",
+  "pinky-finger-metacarpal",
+  "pinky-finger-phalanx-proximal",
+  "pinky-finger-phalanx-intermediate",
+  "pinky-finger-phalanx-distal",
+  "pinky-finger-tip",
 ];
 
 const amicaBones: VRMHumanBoneName[] = [
- 'hips',
- 'spine',
- 'chest',
- 'upperChest',
- 'neck',
+  "hips",
+  "spine",
+  "chest",
+  "upperChest",
+  "neck",
 
- 'head',
- 'leftEye',
- 'rightEye',
- 'jaw',
+  "head",
+  "leftEye",
+  "rightEye",
+  "jaw",
 
- 'leftUpperLeg',
- 'leftLowerLeg',
- 'leftFoot',
- 'leftToes',
+  "leftUpperLeg",
+  "leftLowerLeg",
+  "leftFoot",
+  "leftToes",
 
- 'rightUpperLeg',
- 'rightLowerLeg',
- 'rightFoot',
- 'rightToes',
+  "rightUpperLeg",
+  "rightLowerLeg",
+  "rightFoot",
+  "rightToes",
 
- 'leftShoulder',
- 'leftUpperArm',
- 'leftLowerArm',
- 'leftHand',
+  "leftShoulder",
+  "leftUpperArm",
+  "leftLowerArm",
+  "leftHand",
 
- 'rightShoulder',
- 'rightUpperArm',
- 'rightLowerArm',
- 'rightHand',
+  "rightShoulder",
+  "rightUpperArm",
+  "rightLowerArm",
+  "rightHand",
 ];
-
-let allPlanes = new Map();
-let intersectObjects = new Map();
-let planeId = 1;
 
 /**
  * three.jsを使った3Dビューワー
@@ -119,15 +121,11 @@ export class Viewer {
   private elapsedMsMid: number = 0;
   private elapsedMsSlow: number = 0;
   private _scene?: THREE.Scene;
-  private _floor?: THREE.Mesh;
   private _camera?: THREE.PerspectiveCamera;
   private _cameraControls?: OrbitControls;
   private _stats?: Stats;
   private _statsMesh?: THREE.Mesh;
   private _guiMesh?: THREE.Mesh;
-
-  private _raycaster?: THREE.Raycaster;
-  private _mouse?: THREE.Vector2;
 
   private sendScreenshotToCallback: boolean;
   private screenshotCallback: BlobCallback | undefined;
@@ -147,7 +145,7 @@ export class Viewer {
   private igroup: InteractiveGroup | null = null;
 
   private gparams = {
-    'y-offset': 0,
+    "y-offset": 0,
   };
   private updateMsPanel: any = null;
   private renderMsPanel: any = null;
@@ -178,7 +176,9 @@ export class Viewer {
 
   private mouse = new THREE.Vector2();
 
-  public planeMaterial?: THREE.MeshBasicMaterial;
+  private particleRenderer = new BatchedParticleRenderer();
+  private particleCartoonStarField: THREE.Object3D | null = null;
+
 
   constructor() {
     this.isReady = false;
@@ -191,23 +191,24 @@ export class Viewer {
   }
 
   public async setup(canvas: HTMLCanvasElement) {
-    console.log('setup canvas');
+    console.log("setup canvas");
     const parentElement = canvas.parentElement;
     const width = parentElement?.clientWidth || canvas.width;
     const height = parentElement?.clientHeight || canvas.height;
 
-
     let WebRendererType = THREE.WebGLRenderer;
-    if (config('use_webgpu') === 'true') {
+    if (config("use_webgpu") === "true") {
       // @ts-ignore
-      WebRendererType = (await import("three/src/renderers/webgpu/WebGPURenderer.js")).default;
+      WebRendererType = (
+        await import("three/src/renderers/webgpu/WebGPURenderer.js")
+      ).default;
     }
 
     const renderer = new WebRendererType({
       canvas: canvas,
       alpha: true,
       antialias: true,
-      powerPreference: 'high-performance',
+      powerPreference: "high-performance",
     }) as THREE.WebGLRenderer;
     this._renderer = renderer;
 
@@ -219,7 +220,7 @@ export class Viewer {
     // TODO should this be enabled for only the quest3?
     renderer.xr.setFramebufferScaleFactor(2.0); // reduce pixelation with minimal performance hit on quest 3
     // webgpu does not support foveation yet
-    if (config('use_webgpu') !== 'true') {
+    if (config("use_webgpu") !== "true") {
       renderer.xr.setFoveation(0);
     }
 
@@ -231,20 +232,8 @@ export class Viewer {
     directionalLight.castShadow = false;
     scene.add(directionalLight);
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 2.);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 2);
     scene.add(ambientLight);
-
-    const floorGeometry = new THREE.PlaneGeometry(10, 10);
-    const floorMaterial = new THREE.MeshBasicMaterial({
-      color: 0xFFFFFF,
-      side: THREE.DoubleSide,
-    });
-    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-    this._floor = floor;
-
-    floor.rotation.x = Math.PI / 2;
-    floor.visible = false;
-    // scene.add(floor);
 
     scene.add(this.roomBVHHelperGroup);
 
@@ -254,10 +243,7 @@ export class Viewer {
 
     camera.position.set(0, -3, 3.5);
 
-    const cameraControls = new OrbitControls(
-      camera,
-      renderer.domElement
-    );
+    const cameraControls = new OrbitControls(camera, renderer.domElement);
     this._cameraControls = cameraControls;
 
     cameraControls.screenSpacePanning = true;
@@ -292,11 +278,11 @@ export class Viewer {
       scene.add(controller2);
 
       // @ts-ignore
-      controller1.addEventListener('connected', (event) => {
+      controller1.addEventListener("connected", (event) => {
         this.usingController1 = true;
       });
       // @ts-ignore
-      controller2.addEventListener('connected', (event) => {
+      controller2.addEventListener("connected", (event) => {
         this.usingController2 = true;
       });
 
@@ -305,13 +291,17 @@ export class Viewer {
       const controllerGrip1 = renderer.xr.getControllerGrip(0);
       this.controllerGrip1 = controllerGrip1;
 
-      controllerGrip1.add(controllerModelFactory.createControllerModel(controllerGrip1));
+      controllerGrip1.add(
+        controllerModelFactory.createControllerModel(controllerGrip1),
+      );
       scene.add(controllerGrip1);
 
       const controllerGrip2 = renderer.xr.getControllerGrip(1);
       this.controllerGrip2 = controllerGrip2;
 
-      controllerGrip2.add(controllerModelFactory.createControllerModel(controllerGrip2));
+      controllerGrip2.add(
+        controllerModelFactory.createControllerModel(controllerGrip2),
+      );
       scene.add(controllerGrip2);
 
       const hand1 = renderer.xr.getHand(0);
@@ -323,27 +313,27 @@ export class Viewer {
       scene.add(hand2);
 
       // @ts-ignore
-      hand1.addEventListener('pinchstart', () => {
+      hand1.addEventListener("pinchstart", () => {
         this.isPinching1 = true;
       });
       // @ts-ignore
-      hand2.addEventListener('pinchstart', () => {
+      hand2.addEventListener("pinchstart", () => {
         this.isPinching2 = true;
       });
 
       // @ts-ignore
-      hand1.addEventListener('pinchend', () => {
+      hand1.addEventListener("pinchend", () => {
         this.isPinching1 = false;
       });
       // @ts-ignore
-      hand2.addEventListener('pinchend', () => {
+      hand2.addEventListener("pinchend", () => {
         this.isPinching2 = false;
       });
 
       {
         const geometry = new THREE.BufferGeometry().setFromPoints([
           new THREE.Vector3(0, 0, 0),
-          new THREE.Vector3(0, 0, -1)
+          new THREE.Vector3(0, 0, -1),
         ]);
 
         const line = new THREE.Line(geometry);
@@ -354,7 +344,7 @@ export class Viewer {
       }
 
       // webgpu does not support xr controller events yet
-      if (config('use_webgpu') !== 'true') {
+      if (config("use_webgpu") !== "true") {
         // @ts-ignore
         igroup.listenToXRControllerEvents(controller1);
         // @ts-ignore
@@ -366,15 +356,15 @@ export class Viewer {
 
     // gui
     const gui = new GUI();
-    let updateDebounceId: ReturnType<typeof setTimeout>|null = null;
-    gui.add(this.gparams, 'y-offset', -0.2, 0.2).onChange((value: number) => {
+    let updateDebounceId: ReturnType<typeof setTimeout> | null = null;
+    gui.add(this.gparams, "y-offset", -0.2, 0.2).onChange((value: number) => {
       if (updateDebounceId) {
         clearTimeout(updateDebounceId);
       }
 
       updateDebounceId = setTimeout(() => {
         this.teleport(0, value, 0);
-        this.gparams['y-offset'] = 0;
+        this.gparams["y-offset"] = 0;
       }, 1000);
     });
 
@@ -389,24 +379,33 @@ export class Viewer {
     guiMesh.scale.setScalar(2);
     igroup.add(guiMesh);
 
-
     // stats
     const stats = new Stats();
     this._stats = stats;
 
-    stats.dom.style.width = '80px';
-    stats.dom.style.height = '48px';
-    stats.dom.style.position = 'absolute';
-    stats.dom.style.top = '0px';
-    stats.dom.style.left = window.innerWidth - 80 + 'px';
+    stats.dom.style.width = "80px";
+    stats.dom.style.height = "48px";
+    stats.dom.style.position = "absolute";
+    stats.dom.style.top = "0px";
+    stats.dom.style.left = window.innerWidth - 80 + "px";
     document.body.appendChild(stats.dom);
 
-    this.updateMsPanel  = stats.addPanel(new Stats.Panel('update_ms', '#fff', '#221'));
-    this.renderMsPanel  = stats.addPanel(new Stats.Panel('render_ms', '#ff8', '#221'));
-    this.modelMsPanel   = stats.addPanel(new Stats.Panel('model_ms', '#f8f', '#212'));
-    this.bvhMsPanel     = stats.addPanel(new Stats.Panel('bvh_ms', '#8ff', '#122'));
-    this.raycastMsPanel = stats.addPanel(new Stats.Panel('raycast_ms', '#f8f', '#212'));
-    this.statsMsPanel   = stats.addPanel(new Stats.Panel('stats_ms', '#8f8', '#212'));
+    this.updateMsPanel = stats.addPanel(
+      new Stats.Panel("update_ms", "#fff", "#221"),
+    );
+    this.renderMsPanel = stats.addPanel(
+      new Stats.Panel("render_ms", "#ff8", "#221"),
+    );
+    this.modelMsPanel = stats.addPanel(
+      new Stats.Panel("model_ms", "#f8f", "#212"),
+    );
+    this.bvhMsPanel = stats.addPanel(new Stats.Panel("bvh_ms", "#8ff", "#122"));
+    this.raycastMsPanel = stats.addPanel(
+      new Stats.Panel("raycast_ms", "#f8f", "#212"),
+    );
+    this.statsMsPanel = stats.addPanel(
+      new Stats.Panel("stats_ms", "#8f8", "#212"),
+    );
 
     const statsMesh = new HTMLMesh(stats.dom);
     this._statsMesh = statsMesh;
@@ -422,7 +421,7 @@ export class Viewer {
 
     // add joint / hand meshes
     {
-      const geometry = new THREE.BoxGeometry(0.01, 0.01, 0.01);
+      const geometry = new THREE.BoxGeometry(0.005, 0.005, 0.005);
       const material = new THREE.MeshStandardMaterial({
         color: 0xffffff,
         roughness: 1.0,
@@ -433,7 +432,7 @@ export class Viewer {
 
       const lineGeometry = new THREE.BufferGeometry().setFromPoints([
         new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, -1, 0)
+        new THREE.Vector3(0, -1, 0),
       ]);
 
       const line = new THREE.Line(lineGeometry);
@@ -469,10 +468,13 @@ export class Viewer {
       scene.add(this.closestPart2);
     }
 
-    this.planeMaterial =   new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      opacity: 1.0,
-      transparent: false,
+    this.particleRenderer = new BatchedParticleRenderer();
+    scene.add(this.particleRenderer);
+
+    new QuarksLoader().load('particles/cartoon_star_field', (obj) => {
+      this.particleCartoonStarField = obj;
+
+      this.newParticleInstance();
     });
 
     window.addEventListener("resize", () => {
@@ -485,50 +487,79 @@ export class Viewer {
     });
   }
 
-  public getCanvas() {
-    return this._renderer?.domElement?.parentElement?.getElementsByTagName("canvas")[0];
+
+  public newParticleInstance() {
+    function listener(event: any) {
+      console.log(event.type);
+    }
+
+    const effect = this.particleCartoonStarField!.clone(true);
+    QuarksUtil.runOnAllParticleEmitters(effect, (emitter) => {
+        emitter.system.addEventListener("emitEnd", listener);
+    })
+    QuarksUtil.setAutoDestroy(effect, true);
+    QuarksUtil.addToBatchRenderer(effect, this.particleRenderer);
+    QuarksUtil.play(effect);
+    this._scene!.add(effect);
   }
 
-  public async onSessionStarted(session: XRSession, immersiveType: XRSessionMode, xrAmica: XRAmica) {
-    if (! this._renderer) return;
-    console.log('session', session);
+  public getCanvas() {
+    return this._renderer?.domElement?.parentElement?.getElementsByTagName(
+      "canvas",
+    )[0];
+  }
 
-    this.xrAmica = xrAmica;
+  public async onSessionStarted(
+    session: XRSession,
+    immersiveType: XRSessionMode,
+  ) {
+    if (!this._renderer) return;
+    console.log("session", session);
 
     const canvas = this.getCanvas();
     // TODO this needs to be set to none to prevent double render breaking the compositing
     // except on desktop using emulator, then it should not be changed
     // canvas!.style.display = "none";
 
-    this._renderer.xr.setReferenceSpaceType('local');
+    this._renderer.xr.setReferenceSpaceType("local");
     await this._renderer.xr.setSession(session);
 
     this.teleport(0, -1.2, -1);
 
     // TODO igroup should only be visible if xr doesnt support dom-overlay
     this.igroup!.visible = true;
-    if (immersiveType === 'immersive-vr') {
-      this._floor!.visible = true;
+    if (immersiveType === "immersive-vr") {
       this.handGroup.visible = true;
     }
 
     this.currentSession = session;
-    this.currentSession.addEventListener('end', () => this.onSessionEnded());
+    this.currentSession.addEventListener("end", () => this.onSessionEnded());
 
-    // Temporary double click on screen to trigger single animation 
-    this._renderer.domElement?.parentElement?.addEventListener('dblclick', () => {
-      this.xrAmica?.play();
-    });
-    this.xrAmica.setEnabled(true);
+    /*
+    // TODO this doesnt seem to do anything
+    // https://developers.meta.com/horizon/documentation/web/webxr-frames/
+    if (this.currentSession) {
+      if (this.currentSession.frameRate !== undefined) {
+        console.log("frame rate", this.currentSession.frameRate);
+
+        if (this.currentSession.supportedFrameRates !== undefined) {
+          const frameRates = this.currentSession.supportedFrameRates;
+          console.log("supported frame rates", frameRates);
+
+          this.currentSession.updateTargetFrameRate(frameRates[3]);
+        }
+      }
+    }
+    */
   }
 
   public onSessionEnded(/*event*/) {
     // TODO investigate this
-    if (! this) {
-      console.error('onSessionEnded called without this');
+    if (!this) {
+      console.error("onSessionEnded called without this");
       return;
     }
-    if (! this.currentSession) return;
+    if (!this.currentSession) return;
 
     // reset camera
     this._camera!.position.set(0, -3, 3.5);
@@ -537,58 +568,64 @@ export class Viewer {
     const canvas = this.getCanvas();
     canvas!.style.display = "inline";
 
-    this.currentSession.removeEventListener('end', this.onSessionEnded);
+    this.currentSession.removeEventListener("end", this.onSessionEnded);
     this.currentSession = null;
 
     this.igroup!.visible = false;
-    this._floor!.visible = false;
     this.handGroup.visible = false;
 
     this.xrAmica?.setEnabled(false);
   }
 
   public teleport(x: number, y: number, z: number) {
-    if (! this._renderer?.xr?.isPresenting) return;
+    if (!this._renderer?.xr?.isPresenting) return;
 
     const baseReferenceSpace = this._renderer!.xr.getReferenceSpace();
-    if (! baseReferenceSpace) {
-      console.warn('baseReferenceSpace not found');
+    if (!baseReferenceSpace) {
+      console.warn("baseReferenceSpace not found");
       return;
     }
 
-    const offsetPosition = { x, y, z, w: 1, };
+    const offsetPosition = { x, y, z, w: 1 };
     const offsetRotation = new THREE.Quaternion();
     // offsetRotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
     const transform = new XRRigidTransform(offsetPosition, offsetRotation);
-    const teleportSpaceOffset = baseReferenceSpace.getOffsetReferenceSpace(transform);
+    const teleportSpaceOffset =
+      baseReferenceSpace.getOffsetReferenceSpace(transform);
 
     this._renderer!.xr.setReferenceSpace(teleportSpaceOffset);
   }
 
-  public async loadVrm(url: string, setLoadingProgress: (progress: string) => void) {
+  public async loadVrm(
+    url: string,
+    setLoadingProgress: (progress: string) => void,
+  ) {
     if (this.model?.vrm) {
       this.unloadVRM();
     }
-    setLoadingProgress('Loading VRM');
+    setLoadingProgress("Loading VRM");
 
     // gltf and vrm
     this.model = new Model(this._camera || new THREE.Object3D());
     await this.model.loadVRM(url, setLoadingProgress);
-    setLoadingProgress('VRM loaded');
+    setLoadingProgress("VRM loaded");
     if (!this.model?.vrm) return;
 
     // build bvh
     this.modelBVHGenerator = new StaticGeometryGenerator(this.model.vrm.scene);
-    setLoadingProgress('Creating geometry');
+    setLoadingProgress("Creating geometry");
 
     // TODO show during debug mode
-    const wireframeMaterial = new THREE.MeshBasicMaterial( {
-      wireframe:   true,
+    const wireframeMaterial = new THREE.MeshBasicMaterial({
+      wireframe: true,
       transparent: true,
-      opacity:     0.05,
-      depthWrite:  false,
+      opacity: 0.05,
+      depthWrite: false,
     });
-    this.modelMeshHelper = new THREE.Mesh(new THREE.BufferGeometry(), wireframeMaterial);
+    this.modelMeshHelper = new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      wireframeMaterial,
+    );
     this.modelTargets = [this.modelMeshHelper];
 
     if (config("debug_gfx") === "true") {
@@ -602,19 +639,36 @@ export class Viewer {
 
     this._scene!.add(this.model.vrm.scene);
 
-    const animation = config("animation_url").indexOf("vrma") > 0
-      ? await loadVRMAnimation(config("animation_url"))
-      : await loadMixamoAnimation(config("animation_url"), this.model?.vrm);
-    if (animation) {
-      setLoadingProgress('Loading animation');
-      await this.model.loadAnimation(animation);
-      this.model.update(0);
+    // TODO since poses still work for procedural animation, we can use this to debug
+    if (config("animation_procedural") !== "true") {
+      setLoadingProgress("Loading animation");
+      const animation =
+        config("animation_url").indexOf("vrma") > 0
+          ? await loadVRMAnimation(config("animation_url"))
+          : await loadMixamoAnimation(config("animation_url"), this.model?.vrm);
+      if (animation) {
+        await this.model.loadAnimation(animation);
+        this.model.update(0);
+      }
     }
 
-    setLoadingProgress('Regenerating BVH');
+    this.model?.vrm?.springBoneManager?.joints.forEach((e) => {
+      const geometry = new THREE.SphereGeometry(0.07, 16, 16);
+      const material = new THREE.MeshBasicMaterial({
+        color: 0xffff00,
+        transparent: true,
+        opacity: 0.5,
+        depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.copy(e.bone.getWorldPosition(new THREE.Vector3()));
+      // this._scene!.add(mesh);
+    });
+
+    setLoadingProgress("Regenerating BVH");
     await this.regenerateBVHForModel();
 
-    setLoadingProgress('Complete');
+    setLoadingProgress("Complete");
 
     // HACK: Adjust the camera position after playback because the origin of the animation is offset
     this.resetCamera();
@@ -637,40 +691,49 @@ export class Viewer {
     }
   }
 
-  public loadRoom(url: string) {
+  public async loadRoom(
+    url: string,
+    pos: THREE.Vector3,
+    rot: THREE.Euler,
+    scale: THREE.Vector3,
+    setLoadingProgress: (progress: string) => void,
+  ) {
     if (this.room?.room) {
       this.unloadRoom();
     }
 
     this.room = new Room();
-    return this.room.loadRoom(url).then(async () => {
-      if (!this.room?.room) return;
+    setLoadingProgress("Loading room");
+    await this.room.loadRoom(url, setLoadingProgress);
+    setLoadingProgress(`Room load complete ${this.room}`);
+    if (!this.room?.room) return;
 
-      const roomYOffset = 1.2;
+    this.room.room.position.set(pos.x, pos.y, pos.z);
+    this.room.room.rotation.set(rot.x, rot.y, rot.z);
+    this.room.room.scale.set(scale.x, scale.y, scale.z);
+    this._scene!.add(this.room.room);
 
-      this.room.room.position.set(0, roomYOffset, 0);
-      this._scene!.add(this.room.room);
+    // build bvh
+    this.roomTargets = [];
+    for (let child of this.room.room.children) {
+      if (child instanceof THREE.Mesh) {
+        // this must be cloned because the worker breaks rendering for some reason
+        this.roomTargets.push(child);
+        const geometry = child.geometry.clone() as THREE.BufferGeometry;
+        const bvh = await this.bvhWorker!.generate(geometry, {
+          maxLeafTris: 1,
+        })!;
+        child.geometry.boundsTree = bvh;
 
-      // build bvh
-      this.roomTargets = [];
-      for (let child of this.room.room.children) {
-        if (child instanceof THREE.Mesh) {
-          // this must be cloned because the worker breaks rendering for some reason
-          this.roomTargets.push(child);
-          const geometry = child.geometry.clone() as THREE.BufferGeometry;
-          const bvh = await this.bvhWorker!.generate(geometry, { maxLeafTris: 1 })!;
-          child.geometry.boundsTree = bvh;
-
-          if (config("debug_gfx") === "true") {
-            const helper = new MeshBVHHelper(child, bvh);
-            helper.color.set(0xE91E63);
-            this.roomBVHHelperGroup.add(helper)
-          }
+        if (config("debug_gfx") === "true") {
+          const helper = new MeshBVHHelper(child, bvh);
+          helper.color.set(0xe91e63);
+          this.roomBVHHelperGroup.add(helper);
         }
       }
+    }
 
-      this._scene!.add(this.roomBVHHelperGroup);
-    });
+    this._scene!.add(this.roomBVHHelperGroup);
   }
 
   public unloadRoom(): void {
@@ -687,7 +750,7 @@ export class Viewer {
               geometry?.deleteAttribute(key);
             }
           } catch (e) {
-            console.error('error disposing room geometry', e);
+            console.error("error disposing room geometry", e);
           }
         }
       }
@@ -698,11 +761,11 @@ export class Viewer {
   // probably too slow to use
   // but fun experiment. maybe some use somewhere for tiny splats ?
   public loadSplat(url: string) {
-    if (! this.room) {
+    if (!this.room) {
       this.room = new Room();
     }
     return this.room.loadSplat(url).then(async () => {
-      console.log('splat loaded');
+      console.log("splat loaded");
       if (!this.room?.splat) return;
 
       this.room.splat.position.set(0, 4, 0);
@@ -715,11 +778,11 @@ export class Viewer {
   // TODO run this in its own loop to keep the bvh in sync with animation
   // TODO investigate if we can get speedup using parallel bvh generation
   public async regenerateBVHForModel() {
-    if (! this.modelMeshHelper) return;
+    if (!this.modelMeshHelper) return;
 
     this.modelBVHGenerator!.generate(this.modelMeshHelper!.geometry);
 
-    if (! this.modelMeshHelper!.geometry.boundsTree) {
+    if (!this.modelMeshHelper!.geometry.boundsTree) {
       this.modelMeshHelper!.geometry.computeBoundsTree();
     } else {
       this.modelMeshHelper!.geometry.boundsTree.refit();
@@ -729,13 +792,13 @@ export class Viewer {
   }
 
   public onSelect(event: XRInputSourceEvent) {
-    console.log('onSelect', event);
-    console.log('onSelect', event.inputSource);
-    console.log('onSelect', event.inputSource.hand);
-    console.log('onSelect', event.inputSource.handedness);
-    console.log('onSelect', event.inputSource.gripSpace);
-    console.log('onSelect', event.inputSource.targetRayMode);
-    console.log('onSelect', event.inputSource.targetRaySpace);
+    console.log("onSelect", event);
+    console.log("onSelect", event.inputSource);
+    console.log("onSelect", event.inputSource.hand);
+    console.log("onSelect", event.inputSource.handedness);
+    console.log("onSelect", event.inputSource.gripSpace);
+    console.log("onSelect", event.inputSource.targetRayMode);
+    console.log("onSelect", event.inputSource.targetRaySpace);
   }
 
   public doublePinchHandler() {
@@ -749,15 +812,22 @@ export class Viewer {
       .subVectors(avgControllerPos, cam.position)
       .normalize();
 
-    const controller1Distance = cam.position.distanceTo(this.controller1!.position);
-    const controller2Distance = cam.position.distanceTo(this.controller2!.position);
-    const avgControllerDistance = (controller1Distance + controller2Distance) / 2;
+    const controller1Distance = cam.position.distanceTo(
+      this.controller1!.position,
+    );
+    const controller2Distance = cam.position.distanceTo(
+      this.controller2!.position,
+    );
+    const avgControllerDistance =
+      (controller1Distance + controller2Distance) / 2;
 
     const distanceScale = 1;
-    const d = 0.7 + (avgControllerDistance * distanceScale);
+    const d = 0.7 + avgControllerDistance * distanceScale;
 
-    const pos = new THREE.Vector3()
-      .addVectors(cam.position, directionToControllers.multiplyScalar(d));
+    const pos = new THREE.Vector3().addVectors(
+      cam.position,
+      directionToControllers.multiplyScalar(d),
+    );
 
     this.igroup!.position.copy(pos);
     this.igroup!.lookAt(cam.position);
@@ -775,7 +845,7 @@ export class Viewer {
     this._renderer.setPixelRatio(window.devicePixelRatio);
     this._renderer.setSize(
       parentElement.clientWidth,
-      parentElement.clientHeight
+      parentElement.clientHeight,
     );
 
     this._camera!.aspect =
@@ -783,7 +853,7 @@ export class Viewer {
     this._camera!.updateProjectionMatrix();
   }
 
-  public resizeChatMode(on: boolean){
+  public resizeChatMode(on: boolean) {
     if (!this._renderer) return;
 
     const parentElement = this._renderer.domElement.parentElement;
@@ -793,12 +863,12 @@ export class Viewer {
 
     let width = parentElement.clientWidth;
     let height = parentElement.clientHeight;
-    if (on) {width = width/2; height = height/2; }
+    if (on) {
+      width = width / 2;
+      height = height / 2;
+    }
 
-    this._renderer.setSize(
-      width,
-      height
-    );
+    this._renderer.setSize(width, height);
 
     if (!this._camera) return;
     this._camera.aspect =
@@ -817,7 +887,7 @@ export class Viewer {
       this._camera?.position.set(
         this._camera.position.x,
         headWPos.y,
-        this._camera.position.z
+        this._camera.position.z,
       );
       this._cameraControls?.target.set(headWPos.x, headWPos.y, headWPos.z);
       this._cameraControls?.update();
@@ -829,7 +899,7 @@ export class Viewer {
     const newPosition = new THREE.Vector3(
       this._camera?.position.x,
       1.3,
-      this._camera?.position.z
+      this._camera?.position.z,
     );
     this._camera?.position.lerpVectors(this._camera?.position, newPosition, 0);
     // this._cameraControls?.target.lerpVectors(this._cameraControls?.target,headWPos,0.5);
@@ -845,21 +915,27 @@ export class Viewer {
       function hue2rgb(p: number, q: number, t: number) {
         if (t < 0) t += 1;
         if (t > 1) t -= 1;
-        if (t < 1/6) return p + (q - p) * 6 * t;
-        if (t < 1/2) return q;
-        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        if (t < 1 / 6) return p + (q - p) * 6 * t;
+        if (t < 1 / 2) return q;
+        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
         return p;
       }
 
       var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
       var p = 2 * l - q;
 
-      r = hue2rgb(p, q, h + 1/3);
+      r = hue2rgb(p, q, h + 1 / 3);
       g = hue2rgb(p, q, h);
-      b = hue2rgb(p, q, h - 1/3);
+      b = hue2rgb(p, q, h - 1 / 3);
     }
 
-    return parseInt(`0x`+[r * 255, g * 255, b * 255 ].map(Math.floor).map(v => v.toString(16).padStart(2, '0')).join(''));
+    return parseInt(
+      `0x` +
+        [r * 255, g * 255, b * 255]
+          .map(Math.floor)
+          .map((v) => v.toString(16).padStart(2, "0"))
+          .join(""),
+    );
   }
 
   // itype: 0 = amica, 1 = room
@@ -867,14 +943,14 @@ export class Viewer {
     return;
     const distance = point.distanceTo(this._camera?.position as THREE.Vector3);
     const s = 5;
-    const h = (distance * s) - Math.floor(distance * s);
+    const h = distance * s - Math.floor(distance * s);
 
     const getAmicaColor = () => {
       return this.hslToRgb(h, 1, 0.5);
-    }
+    };
     const getRoomColor = () => {
       return this.hslToRgb(h, 0.1, 0.4);
-    }
+    };
 
     const color = itype == 0 ? getAmicaColor() : getRoomColor();
 
@@ -896,11 +972,11 @@ export class Viewer {
     const handle = (hand: THREE.Group, jointMeshes: THREE.Mesh[]) => {
       // @ts-ignore
       if (hand.joints) {
-        let i=0;
+        let i = 0;
         for (const name of joints) {
           // @ts-ignore
           const joint = hand?.joints[name];
-          if (! joint) {
+          if (!joint) {
             break; // if one isnt found then they all wont be found
           }
           const mesh = jointMeshes[i];
@@ -919,19 +995,25 @@ export class Viewer {
     const checkIntersection = (closestPart: THREE.Object3D) => {
       try {
         if (this.modelTargets.length > 0) {
-          this.intersectsModel = this.raycaster.intersectObjects(this.modelTargets, true);
+          this.intersectsModel = this.raycaster.intersectObjects(
+            this.modelTargets,
+            true,
+          );
         }
         if (this.roomTargets.length > 0) {
-          this.intersectsRoom = this.raycaster.intersectObjects(this.roomTargets, true);
+          this.intersectsRoom = this.raycaster.intersectObjects(
+            this.roomTargets,
+            true,
+          );
         }
       } catch (e) {
         // if the models get removed from scene during raycast then this will throw an error
-        console.error('intersectObjects error', e);
+        console.error("intersectObjects error", e);
         return;
       }
 
       const highlightClosestBone = (point: THREE.Vector3) => {
-        if (! this.model?.vrm) {
+        if (!this.model?.vrm) {
           return;
         }
 
@@ -939,11 +1021,11 @@ export class Viewer {
 
         let closestBone = null;
         let mindist = Number.MAX_VALUE;
-        let closestname = '';
+        let closestname = "";
 
         for (const bone of amicaBones) {
           const node = this.model?.vrm?.humanoid.getNormalizedBoneNode(bone);
-          if (! node) continue;
+          if (!node) continue;
 
           const dist = point.distanceTo(node.getWorldPosition(vec3));
           if (dist < mindist) {
@@ -959,16 +1041,18 @@ export class Viewer {
           closestPart.visible = true;
           // console.log('closest bone', closestname);
         }
-      }
+      };
 
       const handleAmicaIntersection = (point: THREE.Vector3) => {
         highlightClosestBone(point);
-      }
+      };
 
       // check which object is closer
       // TODO clean this up
       if (this.intersectsModel.length > 0 && this.intersectsRoom.length > 0) {
-        if (this.intersectsModel[0].distance < this.intersectsRoom[0].distance) {
+        if (
+          this.intersectsModel[0].distance < this.intersectsRoom[0].distance
+        ) {
           handleAmicaIntersection(this.intersectsModel[0].point);
         } else {
           this.createBallAtPoint(this.intersectsRoom[0].point, 1);
@@ -978,32 +1062,37 @@ export class Viewer {
       } else if (this.intersectsRoom.length > 0) {
         this.createBallAtPoint(this.intersectsRoom[0].point, 1);
       }
-    }
+    };
 
-    if (! this.usingController1 && ! this.usingController2) {
+    if (!this.usingController1 && !this.usingController2) {
       this.raycaster.setFromCamera(this.mouse, this._camera!);
       checkIntersection(this.closestPart1!);
     }
 
-
-
-    const handleController = (controller: THREE.Group, closestPart: THREE.Object3D) => {
+    const handleController = (
+      controller: THREE.Group,
+      closestPart: THREE.Object3D,
+    ) => {
       this.raycasterTempM.identity().extractRotation(controller.matrixWorld);
       this.raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-      this.raycaster.ray.direction.set(0, 0, -1).applyMatrix4(this.raycasterTempM);
+      this.raycaster.ray.direction
+        .set(0, 0, -1)
+        .applyMatrix4(this.raycasterTempM);
       checkIntersection(closestPart);
-    }
+    };
 
     const handleHand = (joints: THREE.Mesh[], closestPart: THREE.Object3D) => {
       for (const joint of joints) {
         const m = joint.matrixWorld;
         this.raycasterTempM.identity().extractRotation(m);
         this.raycaster.ray.origin.setFromMatrixPosition(m);
-        this.raycaster.ray.direction.set(0, -1, 0).applyMatrix4(this.raycasterTempM);
+        this.raycaster.ray.direction
+          .set(0, -1, 0)
+          .applyMatrix4(this.raycasterTempM);
 
         checkIntersection(closestPart);
       }
-    }
+    };
 
     if (this.hand1) {
       handleHand(this.jointMeshes1, this.closestPart1!);
@@ -1019,124 +1108,35 @@ export class Viewer {
 
   // thx @ke456-png :)
   public applyWind(dir: THREE.Vector3, strength: number) {
-    this.model?.vrm?.springBoneManager?.joints.forEach(e => {
-      // console.log('e', e.bone.name);
-      // console.log('e', e);
+    this.model?.vrm?.springBoneManager?.joints.forEach((e) => {
       e.settings.gravityDir = dir;
       e.settings.gravityPower = strength;
     });
   }
 
-  public processPlanes() {
-    const frame = this._renderer?.xr.getFrame();
-    const referenceSpace = this._renderer?.xr.getReferenceSpace();
+  public async loadScenario(url: string) {
+    "use strict";
 
-    if (frame?.detectedPlanes) {
-      console.log(frame.detectedPlanes)
-    }
-    
+    const res = await fetch(url);
+    const classCode = await res.text();
 
-    if (frame?.detectedPlanes) {
-      allPlanes.forEach((planeContext, plane) => {
-        if (!frame.detectedPlanes?.has(plane)) {
-          // plane was removed
-          allPlanes.delete(plane);
-          intersectObjects.delete(plane)
-          console.debug("Plane no longer tracked, id=" + planeContext.id);
+    const ClassDefinition = new Function(`return ${classCode}`)();
 
-          this._scene?.remove(planeContext.mesh);
-        }
-      });
-
-      frame.detectedPlanes.forEach(plane => {
-        const planePose = frame.getPose(plane.planeSpace, referenceSpace!);
-        let planeMesh;
-
-        if (allPlanes.has(plane)) {
-          // may have been updated:
-          const planeContext = allPlanes.get(plane);
-          planeMesh = planeContext.mesh;
-
-          if (planeContext.timestamp < plane.lastChangedTime) {
-            // updated!
-            planeContext.timestamp = plane.lastChangedTime;
-
-            const geometry = this.createGeometryFromPolygon(plane.polygon);
-            planeContext.mesh.geometry.dispose();
-            planeContext.mesh.geometry = geometry;
-          }
-        } else {
-          // new plane
-          
-          // Create geometry:
-          const geometry = this.createGeometryFromPolygon(plane.polygon);
-          planeMesh = new THREE.Mesh(geometry,this.planeMaterial);
-          const box = new THREE.BoxHelper(planeMesh, 0xff0000);  // Red box to visualize the size
-          this._scene?.add(box);
-
-          console.log("Plane mesh position", planeMesh.position);
-          
-          planeMesh.matrixAutoUpdate = false;
-
-          this._scene?.add(planeMesh);
-
-
-          const planeContext = {
-            id: planeId,
-            timestamp: plane.lastChangedTime,
-            mesh: planeMesh,
-          };
-
-          intersectObjects.set(plane, planeContext)
-          allPlanes.set(plane, planeContext);
-          console.debug("New plane detected, id=" + planeId);
-          planeId++;
-        }
-
-        if (planePose) {
-          console.log('Plane Pose:', planePose);
-          planeMesh.visible = true;
-          planeMesh.matrix.fromArray(planePose.transform.matrix);
-        } else {
-          console.log('No pose found for plane');
-          planeMesh.visible = false;
-        }
-      });
-    }
-  }
-
-  public createGeometryFromPolygon(polygon: { x: number, y: number, z: number }[]): THREE.BufferGeometry {
-    const geometry = new THREE.BufferGeometry();
-  
-    const vertices: number[] = [];
-    const uvs: number[] = [];
-    
-    // Loop through each point in the polygon
-    polygon.forEach(point => {
-      vertices.push(point.x, point.y, point.z);
-      uvs.push(point.x, point.z); // Assuming UVs map x and z coordinates
+    const scenario = new ClassDefinition({
+      scope: this,
+      THREE,
     });
-  
-    // Create indices for triangulation
-    const indices: number[] = [];
-    for (let i = 2; i < polygon.length; ++i) {
-      indices.push(0, i - 1, i); // Triangulate the polygon
-    }
-  
-    // Set attributes and index for the geometry
-    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
-    geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
-    geometry.setIndex(indices);
-  
-    return geometry;
+    console.log('scenario', scenario);
+
+    scenario.setup();
+    scenario.update();
   }
-  
 
   public update(time?: DOMHighResTimeStamp, frame?: XRFrame) {
     let utime = performance.now(); // count total update time
 
     // quick exit until setup finishes
-    if (! this.isReady) return;
+    if (!this.isReady) return;
 
     const delta = this._clock.getDelta();
 
@@ -1179,9 +1179,10 @@ export class Viewer {
 
     if (this.elapsedMsMid > 1 / 30) {
       /*
+      const dir = this.
       this.applyWind(
-        new THREE.Vector3(1, 0, -1),
-        (Math.sin(this._clock.elapsedTime * Math.PI / 3) + 1) * 0.1
+        new THREE.Vector3(0, 1, 0),
+        (Math.sin(this._clock.elapsedTime * Math.PI / 3) + 1) * 0.3
       );
       */
 
@@ -1212,7 +1213,6 @@ export class Viewer {
     if (this.sendScreenshotToCallback && this.screenshotCallback) {
       this._renderer!.domElement.toBlob(this.screenshotCallback, "image/jpeg");
       this.sendScreenshotToCallback = false;
-
     }
 
     this.updateMsPanel.update(performance.now() - utime, 40);

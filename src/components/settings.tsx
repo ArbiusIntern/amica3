@@ -61,6 +61,7 @@ import { WhisperCppSettingsPage } from './settings/WhisperCppSettingsPage';
 import { VisionBackendPage } from './settings/VisionBackendPage';
 import { VisionLlamaCppSettingsPage } from './settings/VisionLlamaCppSettingsPage';
 import { VisionOllamaSettingsPage } from './settings/VisionOllamaSettingsPage';
+import { VisionOpenAISettingsPage } from './settings/VisionOpenAISettingsPage';
 import { VisionSystemPromptPage } from './settings/VisionSystemPromptPage';
 
 import { NamePage } from './settings/NamePage';
@@ -128,6 +129,9 @@ export const Settings = ({
   const [visionLlamaCppUrl, setVisionLlamaCppUrl] = useState(config("vision_llamacpp_url"));
   const [visionOllamaUrl, setVisionOllamaUrl] = useState(config("vision_ollama_url"));
   const [visionOllamaModel, setVisionOllamaModel] = useState(config("vision_ollama_model"));
+  const [visionOpenAIApiKey, setVisionOpenAIApiKey] = useState(config("vision_openai_apikey"));
+  const [visionOpenAIUrl, setVisionOpenAIUrl] = useState(config("vision_openai_url"));
+  const [visionOpenAIModel, setVisionOpenAIModel] = useState(config("vision_openai_model"));
   const [visionSystemPrompt, setVisionSystemPrompt] = useState(config("vision_system_prompt"));
 
   const [bgUrl, setBgUrl] = useState(config("bg_url"));
@@ -137,6 +141,7 @@ export const Settings = ({
   const [vrmSaveType, setVrmSaveType] = useState(config('vrm_save_type'));
   const [youtubeVideoID, setYoutubeVideoID] = useState(config("youtube_videoid"));
   const [animationUrl, setAnimationUrl] = useState(config("animation_url"));
+  const [animationProcedural, setAnimationProcedural] = useState<boolean>(config("animation_procedural") === 'true' ? true : false);
 
   const [sttBackend, setSTTBackend] = useState(config("stt_backend"));
   const [sttWakeWordEnabled, setSTTWakeWordEnabled] = useState<boolean>(config("wake_word_enabled") === 'true' ? true : false);
@@ -264,15 +269,17 @@ export const Settings = ({
     visionBackend,
     visionLlamaCppUrl,
     visionOllamaUrl, visionOllamaModel,
+    visionOpenAIApiKey, visionOpenAIUrl, visionOpenAIModel,
     visionSystemPrompt,
     bgColor,
-    bgUrl, vrmHash, vrmUrl, youtubeVideoID, animationUrl,
+    bgUrl, vrmHash, vrmUrl, youtubeVideoID, animationUrl, animationProcedural,
     sttBackend,
     whisperOpenAIApiKey, whisperOpenAIModel, whisperOpenAIUrl,
     whisperCppUrl,
     amicaLifeEnabled, timeBeforeIdle, minTimeInterval, maxTimeInterval, timeToSleep, idleTextPrompt,
     name,
     systemPrompt,
+    debugGfx, mtoonDebugMode, mtoonMaterialType, useWebGPU,
     sttWakeWordEnabled, sttWakeWord,
   ]);
 
@@ -351,7 +358,7 @@ export const Settings = ({
 
     case 'vision':
       return <MenuPage
-        keys={["vision_backend", "vision_llamacpp_settings", "vision_ollama_settings", "vision_system_prompt"]}
+        keys={["vision_backend", "vision_llamacpp_settings", "vision_ollama_settings", "vision_openai_settings", "vision_system_prompt"]}
         menuClick={handleMenuClick} />;
 
     case 'reset_settings':
@@ -414,6 +421,8 @@ export const Settings = ({
         viewer={viewer}
         animationUrl={animationUrl}
         setAnimationUrl={setAnimationUrl}
+        animationProcedural={animationProcedural}
+        setAnimationProcedural={setAnimationProcedural}
         setSettingsUpdated={setSettingsUpdated}
         />
 
@@ -618,6 +627,17 @@ export const Settings = ({
         setVisionOllamaUrl={setVisionOllamaUrl}
         visionOllamaModel={visionOllamaModel}
         setVisionOllamaModel={setVisionOllamaModel}
+        setSettingsUpdated={setSettingsUpdated}
+        />
+
+    case 'vision_openai_settings':
+      return <VisionOpenAISettingsPage
+        visionOpenAIApiKey={visionOpenAIApiKey}
+        setVisionOpenAIApiKey={setVisionOpenAIApiKey}
+        visionOpenAIUrl={visionOpenAIUrl}
+        setVisionOpenAIUrl={setVisionOpenAIUrl}
+        visionOpenAIModel={visionOpenAIModel}
+        setVisionOpenAIModel={setVisionOpenAIModel}
         setSettingsUpdated={setSettingsUpdated}
         />
 
