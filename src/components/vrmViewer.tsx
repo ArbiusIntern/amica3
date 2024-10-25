@@ -149,6 +149,15 @@ export default function VrmViewer({ chatMode }: { chatMode: boolean }) {
             viewer.loadRoom(URL.createObjectURL(file));
           }*/
         });
+
+        // canvas.addEventListener("click", (event) => {
+        //   viewer.onMouseClick(event);
+        //   const intersectionDetected = viewer.onMouseClick(event);
+        //   if (intersectionDetected) {
+        //       console.log("Poked!")
+        //       bot.handlePoked();
+        //   }
+        // });
       }
     },
     [

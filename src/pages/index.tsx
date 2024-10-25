@@ -13,7 +13,6 @@ import {
   ChatBubbleLeftRightIcon,
   CloudArrowDownIcon,
   CodeBracketSquareIcon,
-  CubeIcon,
   CubeTransparentIcon,
   LanguageIcon,
   ShareIcon,
@@ -56,6 +55,7 @@ import { AmicaLifeContext } from "@/features/amicaLife/amicaLifeContext";
 import { ChatModeText } from "@/components/chatModeText";
 
 import { TimestampedPrompt } from "@/features/amicaLife/eventHandler";
+import { XRAmicaContext } from "@/features/vrmViewer/xrAmicaContext";
 
 function detectVRHeadset() {
   const userAgent = navigator.userAgent.toLowerCase();
@@ -100,6 +100,7 @@ export default function Home() {
   const { alert } = useContext(AlertContext);
   const { chat: bot } = useContext(ChatContext);
   const { amicaLife: amicaLife } = useContext(AmicaLifeContext);
+  const { xrAmica: xrAmica } = useContext(XRAmicaContext);
 
   const [chatSpeaking, setChatSpeaking] = useState(false);
   const [chatProcessing, setChatProcessing] = useState(false);
@@ -125,7 +126,6 @@ export default function Home() {
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
 
   const [isARSupported, setIsARSupported] = useState(false);
-  const [isVRSupported, setIsVRSupported] = useState(false);
 
   const [isVRHeadset, setIsVRHeadset] = useState(false);
 
@@ -150,16 +150,10 @@ export default function Home() {
       setIsVRHeadset(deviceInfo.isVRDevice);
 
       window.navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-        console.log('ar supported', supported);
         setIsARSupported(supported);
-      });
-      window.navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
-        console.log('vr supported', supported);
-        setIsVRSupported(supported);
       });
     }
   }, []);
-
 
   function toggleTTSMute() {
     updateConfig('tts_muted', config('tts_muted') === 'true' ? 'false' : 'true')
@@ -199,7 +193,7 @@ export default function Home() {
       console.error("WebXR not supported");
       return;
     }
-    if (! await window.navigator.xr.isSessionSupported(immersiveType)) {
+    if (! await window.navigator.xr.isSessionSupported('immersive-ar')) {
       console.error("Session not supported");
       return;
     }
@@ -209,15 +203,10 @@ export default function Home() {
       return;
     }
 
-    // TODO should hand tracking be required?
-    let optionalFeatures: string[] = ['hand-tracking'];
-    if (immersiveType === 'immersive-ar') {
-      optionalFeatures.push('dom-overlay');
-    }
-
     const sessionInit = {
-      optionalFeatures,
+      optionalFeatures: ['dom-overlay'],
       domOverlay: { root: document.body },
+      // requiredFeatures: ["plane-detection"],
     };
 
     if (viewer.currentSession) {
@@ -248,14 +237,22 @@ export default function Home() {
     }
 
     try {
-      const session = await window.navigator.xr.requestSession(immersiveType, sessionInit);
+      const session = await window.navigator.xr.requestSession('immersive-ar', sessionInit);
 
       viewer.onSessionStarted(session, immersiveType);
     } catch (err) {
       console.error(err);
     }
-
   }
+
+  useEffect(() => {
+    xrAmica.init(
+      viewer,
+      bot,
+      chatSpeaking,
+      chatProcessing,
+    );
+  }, [bot, viewer]);
 
 
   useEffect(() => {
@@ -422,7 +419,7 @@ export default function Home() {
               icon={CubeIcon}
               disabled={!isVRSupported}
               onClick={() => toggleXR('immersive-vr')}
-              label="Virtual Reality"
+              label="Augmented Reality"
             />
 
             <MenuButton

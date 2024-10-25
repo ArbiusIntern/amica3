@@ -27,6 +27,7 @@ import { HTMLMesh } from "three/examples/jsm/interactive/HTMLMesh.js";
 import { loadVRMAnimation } from "@/lib/VRMAnimation/loadVRMAnimation";
 import { loadMixamoAnimation } from "@/lib/VRMAnimation/loadMixamoAnimation";
 import { config } from "@/utils/config";
+import { XRAmica } from "./xrAmica";
 
 import { XRControllerModelFactory } from "./XRControllerModelFactory";
 import { XRHandModelFactory } from "./XRHandModelFactory";
@@ -113,6 +114,7 @@ export class Viewer {
   public isReady: boolean = false;
   public model?: Model;
   public room?: Room;
+  public xrAmica?: XRAmica;
 
   public renderer?: THREE.WebGLRenderer;
   private clock: THREE.Clock;
@@ -630,6 +632,8 @@ export class Viewer {
 
     this.igroup!.visible = false;
     this.handGroup.visible = false;
+
+    this.xrAmica?.setEnabled(false);
   }
 
   public teleport(x: number, y: number, z: number) {
@@ -1206,7 +1210,10 @@ export class Viewer {
 
     this.updateHands();
 
-    this.stats!.update();
+
+
+    // this.processPlanes();
+    this._stats!.update();
 
     let ptime = performance.now();
 
@@ -1221,9 +1228,19 @@ export class Viewer {
     this.physicsMsPanel.update(performance.now() - ptime, 100);
 
     ptime = performance.now();
-    this.model?.update(delta);
-    this.modelMsPanel.update(performance.now() - ptime, 40);
-
+    if (this.model) {
+      const xr = this._renderer?.xr;
+      const camera = this._camera;
+      if (this.currentSession && xr && camera) {
+        this.model.update(delta, xr, camera);
+        this.xrAmica?.update();
+      } else {
+        this.model.update(delta);
+      }
+      
+    }
+    // this.modelMsPanel.update(performance.now() - ptime, 40);
+    
     ptime = performance.now();
     this.renderer!.render(this.scene!, this.camera!);
     this.renderMsPanel.update(performance.now() - ptime, 100);
@@ -1280,4 +1297,5 @@ export class Viewer {
     this.screenshotCallback = callback;
     this.sendScreenshotToCallback = true;
   };
+
 }
