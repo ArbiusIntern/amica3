@@ -132,16 +132,13 @@ export class Model {
                 }
               }
             }
-
-          });
+          }
+        });
+        
 
           // this.setTransparency(0.5);
 
-          if (config("debug_gfx") === "true") {
-            vrm.scene.add(helperRoot);
-
-          }
-        });
+          
 
         if (config("debug_gfx") === "true") {
           vrm.scene.add(helperRoot);

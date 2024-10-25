@@ -28,6 +28,7 @@ import { loadVRMAnimation } from "@/lib/VRMAnimation/loadVRMAnimation";
 import { loadMixamoAnimation } from "@/lib/VRMAnimation/loadMixamoAnimation";
 import { config } from "@/utils/config";
 import { XRAmica } from "./xrAmica";
+import { CCDIKSolver } from 'three/examples/jsm/animations/CCDIKSolver.js';
 
 import { XRControllerModelFactory } from "./XRControllerModelFactory";
 import { XRHandModelFactory } from "./XRHandModelFactory";
@@ -104,6 +105,83 @@ const amicaBones: VRMHumanBoneName[] = [
   "rightLowerArm",
   "rightHand",
 ];
+
+let IKSolver;
+
+const headTargetIndex = amicaBones.indexOf("head");
+const leftHandTargetIndex = amicaBones.indexOf("leftHand");
+const rightHandTargetIndex = amicaBones.indexOf("rightHand");
+const leftFootTargetIndex = amicaBones.indexOf("leftFoot");
+const rightFootTargetIndex = amicaBones.indexOf("rightFoot");
+const torsoTargetIndex = amicaBones.indexOf("chest");
+
+// Map amica bones
+interface AmicaBonesMap {
+  [key: string]: any;  
+}
+
+// Initialize amicaBonesMap with a specific type
+const amicaBonesMap: AmicaBonesMap = {};
+
+const amicaIKs = [
+  // Left Arm IK
+  {
+     target: leftHandTargetIndex,       // Target for the left hand position in the scene
+     effector: amicaBones.indexOf("leftHand"),
+     links: [
+        { index: amicaBones.indexOf("leftLowerArm"), rotationMin: new THREE.Vector3(-1.0, -1.5, -0.5), rotationMax: new THREE.Vector3(0.5, 1.5, 0.5) },
+        { index: amicaBones.indexOf("leftUpperArm"), rotationMin: new THREE.Vector3(-1.5, -0.5, -1.5), rotationMax: new THREE.Vector3(1.5, 1.0, 1.5) },
+        { index: amicaBones.indexOf("leftShoulder"), rotationMin: new THREE.Vector3(-0.5, -0.5, -0.5), rotationMax: new THREE.Vector3(0.5, 0.5, 0.5) }
+     ]
+  },
+  // Right Arm IK
+  {
+     target: rightHandTargetIndex,       // Target for the right hand position in the scene
+     effector: amicaBones.indexOf("rightHand"),
+     links: [
+        { index: amicaBones.indexOf("rightLowerArm"), rotationMin: new THREE.Vector3(-1.0, -1.5, -0.5), rotationMax: new THREE.Vector3(0.5, 1.5, 0.5) },
+        { index: amicaBones.indexOf("rightUpperArm"), rotationMin: new THREE.Vector3(-1.5, -0.5, -1.5), rotationMax: new THREE.Vector3(1.5, 1.0, 1.5) },
+        { index: amicaBones.indexOf("rightShoulder"), rotationMin: new THREE.Vector3(-0.5, -0.5, -0.5), rotationMax: new THREE.Vector3(0.5, 0.5, 0.5) }
+     ]
+  },
+  // Left Leg IK
+  {
+     target: leftFootTargetIndex,       // Target for the left foot position in the scene
+     effector: amicaBones.indexOf("leftFoot"),
+     links: [
+        { index: amicaBones.indexOf("leftLowerLeg"), rotationMin: new THREE.Vector3(0, 0, 0), rotationMax: new THREE.Vector3(1.5, 0.5, 0) },
+        { index: amicaBones.indexOf("leftUpperLeg"), rotationMin: new THREE.Vector3(-1.0, -0.5, -1.5), rotationMax: new THREE.Vector3(1.0, 1.0, 1.5) }
+     ]
+  },
+  // Right Leg IK
+  {
+     target: rightFootTargetIndex,       // Target for the right foot position in the scene
+     effector: amicaBones.indexOf("rightFoot"),
+     links: [
+        { index: amicaBones.indexOf("rightLowerLeg"), rotationMin: new THREE.Vector3(0, 0, 0), rotationMax: new THREE.Vector3(1.5, 0.5, 0) },
+        { index: amicaBones.indexOf("rightUpperLeg"), rotationMin: new THREE.Vector3(-1.0, -0.5, -1.5), rotationMax: new THREE.Vector3(1.0, 1.0, 1.5) }
+     ]
+  },
+  // Spine (Torso) IK
+  {
+     target: torsoTargetIndex,          // Target point for the torso position
+     effector: amicaBones.indexOf("chest"),
+     links: [
+        { index: amicaBones.indexOf("spine"), rotationMin: new THREE.Vector3(-0.5, -0.5, -0.5), rotationMax: new THREE.Vector3(0.5, 0.5, 0.5) },
+        { index: amicaBones.indexOf("hips"), rotationMin: new THREE.Vector3(-0.5, -0.5, -0.5), rotationMax: new THREE.Vector3(0.5, 0.5, 0.5) }
+     ]
+  },
+  // Neck and Head IK
+  {
+     target: headTargetIndex,           // Target point for the head orientation
+     effector: amicaBones.indexOf("head"),
+     links: [
+        { index: amicaBones.indexOf("neck"), rotationMin: new THREE.Vector3(-0.2, -0.5, -0.2), rotationMax: new THREE.Vector3(0.2, 0.5, 0.2) },
+        { index: amicaBones.indexOf("upperChest"), rotationMin: new THREE.Vector3(-0.5, -0.5, -0.5), rotationMax: new THREE.Vector3(0.5, 0.5, 0.5) }
+     ]
+  }
+];
+
 
 /**
  * three.jsを使った3Dビューワー
@@ -376,6 +454,7 @@ export class Viewer {
         ]);
 
         const line = new THREE.Line(geometry);
+        line.name = 'line';
         line.scale.z = 5;
 
         controller1.add(line.clone());
@@ -536,6 +615,14 @@ export class Viewer {
       this.newParticleInstance();
     });
 
+
+    await this.setUpAmicaIKS();
+    IKSolver = new CCDIKSolver( this.model?.vrm?.scene, amicaIKs );
+		const ccdikhelper = new CCDIKHelper( this.model?.vrm?.scene, amicaIKs, 0.01 );
+		scene.add( ccdikhelper );
+
+    this.model.vrm.scene.skeleton
+
     window.addEventListener("resize", () => {
       this.resize();
     });
@@ -543,6 +630,47 @@ export class Viewer {
     this.isReady = true;
     renderer.setAnimationLoop(() => {
       this.update();
+    });
+  }
+
+  public async setUpAmicaIKS() {
+    if (!this.model || !this.model.vrm) {
+      return;
+    }
+
+    this.model.vrm.scene.traverse((obj: any) => {
+      obj.frustumCulled = false;
+
+      if ( obj.name === 'head' ) amicaBonesMap.head = obj;
+      if ( obj.name === 'leftEye' ) amicaBonesMap.leftEye = obj;
+      if ( obj.name === 'rightEye' ) amicaBonesMap.head = obj;
+      if ( obj.name === 'jaw' ) amicaBonesMap.jaw = obj;
+
+      if ( obj.name === 'hips' ) amicaBonesMap.hips = obj;
+      if ( obj.name === 'spine' ) amicaBonesMap.spine = obj;
+      if ( obj.name === 'chest' ) amicaBonesMap.chest = obj;
+      if ( obj.name === 'upperChest' ) amicaBonesMap.upperChest = obj;
+      if ( obj.name === 'neck' ) amicaBonesMap.neck = obj;
+
+      if ( obj.name === 'leftUpperLeg' ) amicaBonesMap.leftUpperLeg = obj;
+      if ( obj.name === 'leftLowerLeg' ) amicaBonesMap.leftLowerLeg = obj;
+      if ( obj.name === 'leftFoot' ) amicaBonesMap.leftFoot = obj;
+      if ( obj.name === 'leftToes' ) amicaBonesMap.leftToes = obj;
+
+      if ( obj.name === 'rightUpperLeg' ) amicaBonesMap.rightUpperLeg = obj;
+      if ( obj.name === 'rightLowerLeg' ) amicaBonesMap.rightLowerLeg = obj;
+      if ( obj.name === 'rightFoot' ) amicaBonesMap.rightFoot = obj;
+      if ( obj.name === 'rightToes' ) amicaBonesMap.rightToes = obj;
+
+      if ( obj.name === 'leftShoulder' ) amicaBonesMap.leftShoulder = obj;
+      if ( obj.name === 'leftUpperArm' ) amicaBonesMap.leftUpperArm = obj;
+      if ( obj.name === 'leftLowerArm' ) amicaBonesMap.leftLowerArm = obj;
+      if ( obj.name === 'leftHand' ) amicaBonesMap.leftHand = obj;
+
+      if ( obj.name === 'rightShoulder' ) amicaBonesMap.rightShoulder = obj;
+      if ( obj.name === 'rightUpperArm' ) amicaBonesMap.rightUpperArm = obj;
+      if ( obj.name === 'rightLowerArm' ) amicaBonesMap.rightLowerArm = obj;
+      if ( obj.name === 'rightHand' ) amicaBonesMap.rightHand = obj;
     });
   }
 
@@ -1215,7 +1343,7 @@ export class Viewer {
 
 
     // this.processPlanes();
-    this._stats!.update();
+    this.stats!.update();
 
     let ptime = performance.now();
 
@@ -1231,8 +1359,8 @@ export class Viewer {
 
     ptime = performance.now();
     if (this.model) {
-      const xr = this._renderer?.xr;
-      const camera = this._camera;
+      const xr = this.renderer?.xr;
+      const camera = this.camera;
       if (this.currentSession && xr && camera) {
         this.model.update(delta, xr, camera);
         this.xrAmica?.update();

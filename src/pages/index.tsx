@@ -13,6 +13,7 @@ import {
   ChatBubbleLeftRightIcon,
   CloudArrowDownIcon,
   CodeBracketSquareIcon,
+  CubeIcon,
   CubeTransparentIcon,
   LanguageIcon,
   ShareIcon,
@@ -417,7 +418,7 @@ export default function Home() {
             <MenuButton
               large={isVRHeadset}
               icon={CubeIcon}
-              disabled={!isVRSupported}
+              disabled={!isARSupported}
               onClick={() => toggleXR('immersive-vr')}
               label="Augmented Reality"
             />
