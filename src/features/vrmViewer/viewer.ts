@@ -535,6 +535,8 @@ export class Viewer {
     this.currentSession = session;
     this.currentSession.addEventListener("end", () => this.onSessionEnded());
 
+    this.xrAmica?.setEnabled(true);
+
     /*
     // TODO this doesnt seem to do anything
     // https://developers.meta.com/horizon/documentation/web/webxr-frames/
